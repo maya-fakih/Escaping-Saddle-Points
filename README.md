@@ -35,29 +35,51 @@ Can my modification improve escape from a saddle? When does it help, when does i
 
     .
     ├── README.md
-    ├── src/            # function, derivatives, optimizers, metrics
-    ├── experiments/    # one script per setting / question
-    ├── results/        # raw runs (z_0..z_K, timings, counts), tables
-    ├── figures/        # contours, gap-vs-updates, parameter plots
-    ├── notes/          # derivations and paper notes
-    └── report/         # LaTeX source
+    ├── requirements.txt
+    ├── simulate.py               # opens the 3D simulator: python simulate.py <method>
+    ├── saddle/
+    │   ├── benchmark.py          # f, gradient, Hessian, with Nf/Ng/NH counters
+    │   ├── cases.py              # S1-S5 and the default parameters
+    │   ├── simulator.py          # the 3D window + dashboard
+    │   └── algorithms/
+    │       ├── base.py           # Algorithm: the parent class (step, run, backtracking)
+    │       └── <method>.py       # one child per method, on its own branch
+    └── tests/
+        ├── test_benchmark.py     # checks the shared pieces (on main)
+        └── test_<method>.py      # checks only that branch's method
 
-## Branch workflow
+Every method is a child of `Algorithm` and only writes `update()`: how to go from the
+current point to the next one. The parent does the rest (counting iterations, keeping the
+path, stopping, Armijo backtracking). The simulator takes any child, so a new idea only
+needs a new file.
 
-`main` stays clean: only merged, verified work lands here.
+## Branches
 
-| Branch | Content |
-|--------|---------|
-| `prep-a1-geometry` | Gradient, Hessian, stationary points, numerical checks, GD analysis, Newton |
-| `prep-a2-papers` | Notes on Jin et al. 2017 and Lee et al. 2016 |
-| `q1-curvature` | S1-S3 |
-| `q2-exact-saddle` | S4 |
-| `q3-near-minimum` | S5 |
-| `q4-parameters` | Parameter sweeps on S2 |
-| `proposed-method` | Design, S1-S5 comparison, S2 ablation |
-| `report` | LaTeX report |
+`main` holds the shared pieces. Each method lives on its own branch, made from `main`
+and **not merged back**; each branch has a test that checks only its method.
 
-Each branch is merged into `main` through a pull request once its results are checked.
+| Branch | Adds | Test |
+|--------|------|------|
+| `main` | benchmark, base class, simulator | `python -m unittest tests.test_benchmark` |
+| `gd` | plain GD with backtracking | `python -m unittest tests.test_gd` |
+| `pgd` | P-GD (random kick in a disk of radius r when the gradient is small) | `python -m unittest tests.test_pgd` |
+| `gdnc` | GD-NC (step along the most negative Hessian direction) | `python -m unittest tests.test_gdnc` |
+| `probe` | my method: learned per-axis step sizes + axis probes | `python -m unittest tests.test_probe` |
+
+## Running
+
+    pip install -r requirements.txt
+    git checkout gd                      # or pgd, gdnc, probe
+    python -m unittest discover tests    # that branch's test + the shared ones
+    python simulate.py gd --case S1      # the 3D simulator
+
+Simulator options: `--case S1..S5`, `--speed <steps per second>`, `--iters <max updates>`,
+`--frames 0 10 100` (save PNG pictures at those iterations instead of opening a window).
+
+In the window: **Play/Pause** runs it at the slider's speed, **Step** moves it one update,
+**Reset** goes back to the start. The panel shows k, the point, f, f*, the gradient and its
+norm, the Hessian (or n/a when the method does not use it), and the work Nf / Ng / NH.
+The values shown on screen are not counted as work.
 
 ## Experimental setup (fixed)
 
@@ -86,13 +108,6 @@ Normalized gap q_k = (f(z_k) − f*) / Δ, with Δ = f_s − f*. Reported: escap
 
 - **October 30, 2026**: report + code
 - **November 4, 2026**: presentation and discussion
-
-## Running
-
-    pip install numpy scipy matplotlib
-    python experiments/run_all.py
-
-(Update this section as the code takes shape.)
 
 ## References
 
