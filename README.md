@@ -36,10 +36,12 @@ Can my modification improve escape from a saddle? When does it help, when does i
     .
     ├── README.md
     ├── requirements.txt
-    ├── simulate.py               # opens the 3D simulator: python simulate.py <method>
+    ├── Makefile                  # make install / make run visual / make run headless / make test
+    ├── main.py                   # what make run calls (visual or headless)
     ├── saddle/
     │   ├── benchmark.py          # f, gradient, Hessian, with Nf/Ng/NH counters
     │   ├── cases.py              # S1-S5 and the default parameters
+    │   ├── metrics.py            # escape / success iteration, gap, work for one run
     │   ├── simulator.py          # the 3D window + dashboard
     │   └── algorithms/
     │       ├── base.py           # Algorithm: the parent class (step, run, backtracking)
@@ -65,21 +67,32 @@ and **not merged back**; each branch has a test that checks only its method.
 | `pgd` | P-GD (random kick in a disk of radius r when the gradient is small) | `python -m unittest tests.test_pgd` |
 | `gdnc` | GD-NC (step along the most negative Hessian direction) | `python -m unittest tests.test_gdnc` |
 | `probe` | my method: learned per-axis step sizes + axis probes | `python -m unittest tests.test_probe` |
+| `all-methods` | all four together, to compare them in one window | all of the above |
 
 ## Running
 
-    pip install -r requirements.txt
-    git checkout gd                      # or pgd, gdnc, probe
-    python -m unittest discover tests    # that branch's test + the shared ones
-    python simulate.py gd --case S1      # the 3D simulator
+    make install                    # once: venv in ../venv + numpy, matplotlib
+    git checkout all-methods        # or gd, pgd, gdnc, probe
+    make test                       # the tests on this branch
+    make run visual                 # 3D window, pick the method in the window
+    make run headless ALG=all       # no window, prints a results table
 
-Simulator options: `--case S1..S5`, `--speed <steps per second>`, `--iters <max updates>`,
-`--frames 0 10 100` (save PNG pictures at those iterations instead of opening a window).
+Settings (all optional): `ALG` (gd, pgd, gdnc, probe or all), `CASE` (S1..S5), `GAMMA`,
+`X0`, `Y0` (override the case), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
+(steps per second in the window). Example:
 
-In the window: **Play/Pause** runs it at the slider's speed, **Step** moves it one update,
-**Reset** goes back to the start. The panel shows k, the point, f, f*, the gradient and its
-norm, the Hessian (or n/a when the method does not use it), and the work Nf / Ng / NH.
-The values shown on screen are not counted as work.
+    make run headless ALG=pgd CASE=S3 SEED=4 K=500
+    make run visual ALG=gdnc GAMMA=0.5 X0=0.3 Y0=0 SPEED=20
+
+In the window: drag to **rotate** the 3D view, scroll to zoom. On the right: the
+**Algorithm** picker, **Play/Pause** (runs at the slider speed), **Step** (one update),
+**Reset**, and the numbers at the current point: k, z, f, f*, the gradient and its norm,
+the Hessian (n/a when the method does not use it) and the work Nf / Ng / NH. The numbers
+on screen are computed without counting, so they do not change the work.
+
+Headless columns: `k_esc` = first k that is 10% of the way down from the saddle,
+`k_succ` = first k at a real minimum (gap <= 1e-4, |grad| <= 1e-5, no negative curvature),
+gap q = (f - f*) / (f_saddle - f*). Definitions in `saddle/metrics.py`.
 
 ## Experimental setup (fixed)
 
