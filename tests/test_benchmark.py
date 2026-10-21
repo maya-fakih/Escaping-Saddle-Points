@@ -6,7 +6,7 @@ Checks for the shared pieces on main: the benchmark's math and the base class.
 import unittest
 import numpy as np
 
-from saddle.benchmark import Benchmark
+from saddle.benchmark import Benchmark, Star
 from saddle.algorithms.base import Algorithm
 
 
@@ -38,6 +38,27 @@ class TestBenchmark(unittest.TestCase):
         P = Benchmark(1.0)
         P.f([0, 0]); P.f([0, 0]); P.grad([0, 0]); P.peek_f([1, 1])
         self.assertEqual((P.nf, P.ng, P.nh), (2, 1, 0))
+
+
+class TestStar(unittest.TestCase):
+    def test_derivatives_match_finite_differences(self):
+        P, h = Star(), 1e-6
+        for z in [np.array([0.3, -0.7]), np.array([0.9, 0.2]), np.array([-0.4, 0.5])]:
+            num_g = [(P.peek_f(z + h * e) - P.peek_f(z - h * e)) / (2 * h) for e in np.eye(2)]
+            np.testing.assert_allclose(P.peek_grad(z), num_g, atol=1e-8)
+            num_h = np.column_stack([(P.peek_grad(z + h * e) - P.peek_grad(z - h * e)) / (2 * h)
+                                     for e in np.eye(2)])
+            np.testing.assert_allclose(P.peek_hess(z), num_h, atol=1e-6)
+
+    def test_minima_and_degenerate_saddle(self):
+        P = Star()
+        for m in P.minima:
+            np.testing.assert_allclose(P.peek_grad(m), 0, atol=1e-12)
+            self.assertAlmostEqual(P.peek_f(m), P.fstar)
+        np.testing.assert_array_equal(P.peek_hess([0.0, 0.0]), 0)   # flat to 2nd order
+        r = 1e-2                                                     # axis probes all go up
+        for u in ([r, 0], [-r, 0], [0, r], [0, -r]):
+            self.assertGreater(P.peek_f(np.array(u)), 0)
 
 
 class Halfway(Algorithm):
