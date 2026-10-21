@@ -69,6 +69,7 @@ and **not merged back**; each branch has a test that checks only its method.
 | `probe` | my method: learned per-axis step sizes + axis probes | `python -m unittest tests.test_probe` |
 | `probe-nesterov` | probes only when the gradient is tiny, then Nesterov momentum | `python -m unittest tests.test_probe_nesterov` |
 | `probe-walk` | probes when stuck; if all probes look equal (flat) move to one and look further (probe length doubles); turn the axes before calling it a minimum | `python -m unittest tests.test_probe_walk` |
+| `learned-step` | only the per-axis step sizes learned from predicted vs actual drop (no probes) | `python -m unittest tests.test_learned_step` |
 | `all-methods` | all four together, to compare them in one window | all of the above |
 
 ## Running
@@ -79,7 +80,7 @@ and **not merged back**; each branch has a test that checks only its method.
     make run visual                 # 3D window, pick the method in the window
     make run headless ALG=all       # no window, prints a results table
 
-Settings (all optional): `ALG` (gd, pgd, gdnc, probe, probe_nesterov, probe_walk or all), `FUNC` (assignment or star), `CASE` (S1..S5), `GAMMA`,
+Settings (all optional): `ALG` (gd, pgd, gdnc, probe, probe_nesterov, probe_walk, learned_step or all), `FUNC` (assignment or star), `CASE` (S1..S5), `GAMMA`,
 `X0`, `Y0` (override the case), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
 (steps per second in the window). Example:
 
