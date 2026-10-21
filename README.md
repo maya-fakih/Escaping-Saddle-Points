@@ -67,6 +67,7 @@ and **not merged back**; each branch has a test that checks only its method.
 | `pgd` | P-GD (random kick in a disk of radius r when the gradient is small) | `python -m unittest tests.test_pgd` |
 | `gdnc` | GD-NC (step along the most negative Hessian direction) | `python -m unittest tests.test_gdnc` |
 | `probe` | my method: learned per-axis step sizes + axis probes | `python -m unittest tests.test_probe` |
+| `probe-nesterov` | probes only when the gradient is tiny, then Nesterov momentum | `python -m unittest tests.test_probe_nesterov` |
 | `all-methods` | all four together, to compare them in one window | all of the above |
 
 ## Running
@@ -77,7 +78,7 @@ and **not merged back**; each branch has a test that checks only its method.
     make run visual                 # 3D window, pick the method in the window
     make run headless ALG=all       # no window, prints a results table
 
-Settings (all optional): `ALG` (gd, pgd, gdnc, probe or all), `CASE` (S1..S5), `GAMMA`,
+Settings (all optional): `ALG` (gd, pgd, gdnc, probe, probe_nesterov or all), `CASE` (S1..S5), `GAMMA`,
 `X0`, `Y0` (override the case), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
 (steps per second in the window). Example:
 
