@@ -23,8 +23,8 @@ class TestProbeWalk(unittest.TestCase):
             a = run(Benchmark(gamma), z0)
             self.assertAlmostEqual(a.problem.peek_f(a.z), a.problem.fstar, places=8, msg=case)
 
-    def test_star_saddle_needs_a_walk_then_escapes(self):
-        # at (0, 0) of the star, all 4 axis probes go up: the first round must walk
+    def test_star_saddle_is_flat_so_it_walks_then_escapes(self):
+        # at (0, 0) of the star, the axis probes change f by only ~1e-9: "equal", so walk
         for seed in range(10):
             a = run(Star(), (0.0, 0.0), seed=seed)
             self.assertEqual(a.walk_steps[0], 0)
@@ -33,6 +33,12 @@ class TestProbeWalk(unittest.TestCase):
     def test_star_from_the_axis(self):
         a = run(Star(), (0.5, 0.0))
         self.assertAlmostEqual(a.problem.peek_f(a.z), a.problem.fstar, places=8)
+
+    def test_assignment_saddle_is_not_flat_so_no_walk(self):
+        # f_gamma=1 drops by ~5e-5 along y at distance 0.01: a clear LOWER probe
+        a = run(Benchmark(1.0), (0.0, 0.0), iters=50)
+        self.assertEqual(a.walk_steps, [])
+        self.assertEqual(a.jumps[0], 0)
 
     def test_gives_up_and_stays_at_a_minimum(self):
         P = Star()
