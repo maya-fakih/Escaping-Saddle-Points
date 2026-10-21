@@ -70,6 +70,9 @@ class Benchmark:
     def label(self):
         return f"gamma = {self.gamma}"
 
+    # the simulator hides the surface above this height (None = show everything)
+    zcap = None
+
 
 class Star(Benchmark):
     """
@@ -125,7 +128,10 @@ class Star(Benchmark):
 
     @property
     def scale(self):
-        return 1.0
+        return 0.75             # box of +-1.2: the minima at distance 1 fit inside
+
+    # the r^6 part shoots up at the corners and would squash the saddle flat
+    zcap = 0.25
 
     @property
     def label(self):
