@@ -83,7 +83,10 @@ class Simulator:
         if p.label == "star saddle":                  # minima on the diagonals: square box
             xmax = ymax = max(xmax, ymax)
         X, Y = np.meshgrid(np.linspace(-xmax, xmax, 80), np.linspace(-ymax, ymax, 80))
-        self.ax.plot_surface(X, Y, p.peek_f((X, Y)), cmap="viridis", alpha=0.45, linewidth=0)
+        Z = p.peek_f((X, Y))
+        if p.zcap is not None:
+            Z = np.where(Z > p.zcap, np.nan, Z)       # cut off the very high parts
+        self.ax.plot_surface(X, Y, Z, cmap="viridis", alpha=0.45, linewidth=0)
         self.ax.set_xlabel("x"); self.ax.set_ylabel("y"); self.ax.set_zlabel("f")
         # the path (black line) and the current point (red dot); updated in redraw()
         (self.path_line,) = self.ax.plot([], [], [], "k.-", lw=1.8, ms=4)
