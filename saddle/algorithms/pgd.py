@@ -1,14 +1,28 @@
 """
-Perturbed gradient descent, the assignment's practical version (page 2-3).
+Perturbed gradient descent, the assignment's practical version (pages 2-3).
 
-Each update:
+WHY WE HAVE IT
+  GD gets stuck because, right at the saddle, the gradient does not point anywhere.
+  But a saddle is unstable: if you are even a little off it in the "downhill"
+  direction (y here), the negative curvature pushes you further away and GD then
+  escapes by itself. So when the gradient is tiny we give the point a small
+  random kick. We do not need to know WHICH way is down: a random direction
+  almost surely has some component along it (Jin et al. 2017 make this precise).
+
+THE STEP
   1. if ||grad f(z)|| <= g_trig and at least T updates passed since the last kick:
-       kick: w = z + (random point in a disk of radius r)
+       w = z + (a uniform random point in a disk of radius r)
      otherwise w = z
   2. one GD step with backtracking FROM w.
 
-The random kick pushes the point off the saddle, so the negative curvature
-can take over. Without a kick, GD started exactly on the saddle never moves.
+THE KNOBS
+  g_trig : how small the gradient must be to count as "stuck"
+  r      : kick size. Too small: still stuck; too large: may undo progress
+  T      : wait at least T updates between kicks, so GD has time to use the kick
+  seed   : the random numbers; same seed -> same run (needed to compare fairly)
+
+COST
+  Like GD, plus 1 f + 1 gradient at each kick. No Hessian. Random, so we run 10 seeds.
 """
 import numpy as np
 
