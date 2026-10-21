@@ -1,14 +1,14 @@
 """
 Entry point. Usually you call it through the Makefile (make run ...), but it works alone:
 
-    python main.py visual   --alg gd   --case S1
-    python main.py headless --alg all  --case S3 --k 3000
+    python main.py visual   --alg gd   --gamma 0.1
+    python main.py headless --alg all  --gamma 1 0.1 0.01 --x0 0.05 --y0 1e-8
 
 visual   : opens the 3D simulator; pick the method in the window.
 headless : no window; runs the method(s) to the end and prints a results table.
 
-Every setting is a parameter. --case fills in gamma and the start point from the
-assignment; --gamma / --x0 / --y0 override it. --func star swaps the assignment's
+Every setting is a parameter: gamma (> 0), the start (x0, y0), K, ... Headless takes
+several gammas at once and prints one table per gamma. --func star swaps the assignment's
 function for the harder star saddle (see saddle/benchmark.py; gamma is ignored there).
 Each method only receives the parameters it actually has (P-GD takes seed, r, T; GD takes none of those).
 """
@@ -18,19 +18,27 @@ import time
 
 from saddle.algorithms import available, load
 from saddle.benchmark import FUNCTIONS
-from saddle.cases import CASES, K, G_TRIG, R, T
+from saddle.cases import K, G_TRIG, R, T
 from saddle.metrics import evaluate
+
+
+def positive(text):
+    """argparse type: a number that must be > 0 (gamma = 0 has no saddle/minima split)."""
+    value = float(text)
+    if value <= 0:
+        raise argparse.ArgumentTypeError(f"gamma must be > 0, got {text}")
+    return value
 
 
 def parse():
     ap = argparse.ArgumentParser()
     ap.add_argument("mode", choices=["visual", "headless"])
     ap.add_argument("--alg", default="all", help="a method on this branch, or 'all'")
-    ap.add_argument("--case", default="S1", choices=CASES)
     ap.add_argument("--func", default="assignment", choices=FUNCTIONS, help="which function")
-    ap.add_argument("--gamma", type=float, help="overrides the case's gamma")
-    ap.add_argument("--x0", type=float, help="overrides the case's start x")
-    ap.add_argument("--y0", type=float, help="overrides the case's start y")
+    ap.add_argument("--gamma", type=positive, nargs="+", default=[1.0],
+                    help="one or more gammas > 0 (visual uses the first)")
+    ap.add_argument("--x0", type=float, default=0.05, help="start x")
+    ap.add_argument("--y0", type=float, default=1e-8, help="start y")
     ap.add_argument("--k", type=int, default=K, help="max number of updates")
     ap.add_argument("--seed", type=int, default=0, help="random seed (P-GD)")
     ap.add_argument("--g-trig", type=float, default=G_TRIG, help="'gradient is small' threshold")
@@ -42,11 +50,9 @@ def parse():
     return ap.parse_args()
 
 
-def builder(args):
+def builder(args, gamma):
     """Returns build(name): makes a fresh Algorithm with all the chosen settings."""
-    gamma, (x0, y0) = CASES[args.case]
-    gamma = args.gamma if args.gamma is not None else gamma
-    z0 = (args.x0 if args.x0 is not None else x0, args.y0 if args.y0 is not None else y0)
+    z0 = (args.x0, args.y0)
     settings = dict(max_iters=args.k, seed=args.seed, g_trig=args.g_trig, r=args.r, T=args.t)
 
     def build(name):
@@ -94,7 +100,7 @@ def visual(args, build, names):
         while sim.algo.k < target and not sim.algo.done:
             sim.algo.step()                  # step without redrawing: much faster
         sim.redraw()
-        out = f"frame_{first}_{args.case}_{sim.algo.k}.png"
+        out = f"frame_{first}_gamma{args.gamma[0]:g}_{sim.algo.k}.png"
         sim.save(out)
         print("saved", out)
 
@@ -106,10 +112,13 @@ def main():
         raise SystemExit("No methods on this branch. Try: git checkout all-methods")
     for n in names:
         load(n)                              # clear error message if a name is wrong
-    build, z0 = builder(args)
     if args.mode == "headless":
-        headless(build, names, z0)
+        for gamma in args.gamma:
+            build, z0 = builder(args, gamma)
+            headless(build, names, z0)
+            print()
     else:
+        build, _ = builder(args, args.gamma[0])
         visual(args, build, names)
 
 

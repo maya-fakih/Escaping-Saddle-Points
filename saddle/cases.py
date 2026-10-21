@@ -1,4 +1,8 @@
-"""The five settings from the assignment (page 4): name -> (gamma, start point)."""
+"""
+The five settings from the assignment (page 4): name -> (gamma, start point).
+The program does not need them (pass GAMMA, X0, Y0 directly); the tests use them
+to check each method on the exact settings the report talks about.
+"""
 
 CASES = {
     "S1": (1.0, (0.05, 1e-8)),        # strong negative curvature, start next to the saddle
