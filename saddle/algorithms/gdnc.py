@@ -1,17 +1,28 @@
 """
 GD with a negative-curvature step (GD-NC), as in the assignment (page 3).
 
-Each update:
-  - if ||grad f(z)|| <= g_trig: compute the Hessian, take its smallest
-    eigenvalue lam and its eigenvector v.
-      if lam < -1e-4 (we really are near a saddle):
-        p = v or -v, whichever points downhill (+v when the gradient is 0)
-        backtrack along p: accept t when f(z + t p) <= f(z) + 1e-4 * t^2 * lam
-  - otherwise (or if that did not apply): a normal GD step with backtracking.
+WHY WE HAVE IT
+  GD only looks at the slope (first-order Taylor). At a saddle the slope is ~0, but
+  the second-order term of Taylor is not:
+      f(z + s) ~ f(z) + grad f . s + (1/2) s^T H s
+  If H has a negative eigenvalue lam with eigenvector v, then moving along v makes
+  the last term negative: f goes DOWN like (1/2) t^2 lam. So instead of guessing
+  (P-GD's random kick), we ask the Hessian which way bends down and go there.
 
-It does not guess like P-GD: the Hessian tells it exactly which way the
-surface bends down. The price is one Hessian (and an eigen-decomposition)
-each time the gradient is small.
+THE STEP
+  - if ||grad f(z)|| <= g_trig: compute H, its smallest eigenvalue lam and its vector v.
+      if lam < -1e-4 (really a saddle, not a flat minimum):
+        p = v or -v, whichever does not go uphill (+v when the gradient is 0)
+        backtrack along p: accept t when f(z + t p) <= f(z) + 1e-4 * t^2 * lam
+  - otherwise: a normal GD step with backtracking.
+
+WHY lam < -1e-4 AND NOT lam < 0
+  Near a minimum the smallest eigenvalue is >= 0, so no curvature step happens (S5).
+  The small margin keeps rounding noise from triggering it.
+
+COST
+  Like GD, plus 1 Hessian and an eigen-decomposition each time the gradient is small.
+  Cheap in 2D, expensive in high dimension: that is the trade-off vs P-GD.
 """
 import numpy as np
 
