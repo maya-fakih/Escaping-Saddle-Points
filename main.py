@@ -51,17 +51,19 @@ def parse():
 
 
 def builder(args, gamma):
-    """Returns build(name): makes a fresh Algorithm with all the chosen settings."""
-    z0 = (args.x0, args.y0)
+    """Returns build(name, gamma, z0): makes a fresh Algorithm with all the chosen
+    settings. gamma and z0 default to the command line values; the window passes
+    its own when you change them there."""
+    start = (args.x0, args.y0)
     settings = dict(max_iters=args.k, seed=args.seed, g_trig=args.g_trig, r=args.r, T=args.t)
 
-    def build(name):
+    def build(name, gamma=gamma, z0=start):
         cls = load(name)
         accepted = inspect.signature(cls.__init__).parameters
         kwargs = {key: val for key, val in settings.items() if key in accepted}
         return cls(FUNCTIONS[args.func](gamma), z0, **kwargs)
 
-    return build, z0
+    return build, start
 
 
 def headless(build, names, z0):
@@ -92,7 +94,7 @@ def visual(args, build, names):
     from saddle.simulator import Simulator
 
     first = names[0]
-    sim = Simulator(build, available(), first, speed=args.speed)
+    sim = Simulator(build, available(), first, args.gamma[0], (args.x0, args.y0), speed=args.speed)
     if args.frames is None:
         sim.show()
         return
