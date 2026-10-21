@@ -1,7 +1,7 @@
 """
 The numbers we report for one run (same definitions as the report's tables).
 
-With f_s = 0 (f at the saddle) and f* = -gamma^2/4 (f at a minimum), let
+With f_s = 0 (f at the saddle, for both functions) and f* (f at a minimum), let
 Delta = f_s - f*  (how far down the minimum is below the saddle).
 
   gap q_k        = (f(z_k) - f*) / Delta     1 at the saddle, 0 at a minimum

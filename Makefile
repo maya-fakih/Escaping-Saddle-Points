@@ -7,6 +7,7 @@
 # Every setting can be changed on the command line, e.g.
 #   make run headless ALG=pgd CASE=S3 SEED=4 K=500
 #   make run visual ALG=gdnc GAMMA=0.5 X0=0.3 Y0=0 SPEED=20
+#   make run headless FUNC=star X0=0 Y0=0       (the harder star saddle)
 # ---------------------------------------------------------------------------
 
 VENV ?= ../venv
@@ -14,6 +15,7 @@ PY   := $(VENV)/bin/python
 
 # settings (empty = use the default from saddle/cases.py)
 ALG    ?= all
+FUNC   ?= assignment
 CASE   ?= S1
 GAMMA  ?=
 X0     ?=
@@ -25,7 +27,7 @@ R      ?= 1e-2
 T      ?= 20
 SPEED  ?= 5
 
-ARGS := --alg $(ALG) --case $(CASE) --k $(K) --seed $(SEED) --g-trig $(G_TRIG) \
+ARGS := --alg $(ALG) --func $(FUNC) --case $(CASE) --k $(K) --seed $(SEED) --g-trig $(G_TRIG) \
         --r $(R) --t $(T) --speed $(SPEED) \
         $(if $(GAMMA),--gamma $(GAMMA)) $(if $(X0),--x0 $(X0)) $(if $(Y0),--y0 $(Y0))
 
