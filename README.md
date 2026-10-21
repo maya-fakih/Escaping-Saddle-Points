@@ -68,6 +68,7 @@ and **not merged back**; each branch has a test that checks only its method.
 | `gdnc` | GD-NC (step along the most negative Hessian direction) | `python -m unittest tests.test_gdnc` |
 | `probe` | my method: learned per-axis step sizes + axis probes | `python -m unittest tests.test_probe` |
 | `probe-nesterov` | probes only when the gradient is tiny, then Nesterov momentum | `python -m unittest tests.test_probe_nesterov` |
+| `probe-walk` | probes when stuck; if all probes look equal (flat) move to one and look further (probe length doubles); turn the axes before calling it a minimum | `python -m unittest tests.test_probe_walk` |
 | `all-methods` | all four together, to compare them in one window | all of the above |
 
 ## Running
@@ -78,12 +79,17 @@ and **not merged back**; each branch has a test that checks only its method.
     make run visual                 # 3D window, pick the method in the window
     make run headless ALG=all       # no window, prints a results table
 
-Settings (all optional): `ALG` (gd, pgd, gdnc, probe, probe_nesterov or all), `CASE` (S1..S5), `GAMMA`,
+Settings (all optional): `ALG` (gd, pgd, gdnc, probe, probe_nesterov, probe_walk or all), `FUNC` (assignment or star), `CASE` (S1..S5), `GAMMA`,
 `X0`, `Y0` (override the case), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
 (steps per second in the window). Example:
 
     make run headless ALG=pgd CASE=S3 SEED=4 K=500
     make run visual ALG=gdnc GAMMA=0.5 X0=0.3 Y0=0 SPEED=20
+    make run headless FUNC=star X0=0 Y0=0
+
+`FUNC=star` is a harder saddle: f = (x^4 - 6x^2y^2 + y^4)/4 + (x^2+y^2)^3/6. At (0, 0) the
+gradient and the Hessian are both zero, the four axes are ridges and the valleys are on the
+diagonals (minima at distance 1, f* = -1/12). Details in `saddle/benchmark.py`.
 
 In the window: drag to **rotate** the 3D view, scroll to zoom. On the right: the
 **Algorithm** picker, **Play/Pause** (runs at the slider speed), **Step** (one update),
