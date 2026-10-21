@@ -72,10 +72,13 @@ class Simulator:
 
     # ------------------------------------------------------------------
     def _draw_surface(self):
-        """Draw f once. The box shows the saddle, both minima and the start point."""
+        """Draw f once. The box shows the saddle, both minima and the start point.
+        It is scaled with gamma: the minima sit at y = +-sqrt(gamma), so for a small
+        gamma (S3) a fixed box would make the whole saddle look flat."""
         p, z0 = self.algo.problem, self.algo.z0
-        xmax = max(1.0, 1.2 * abs(z0[0]))
-        ymax = max(1.5, 1.5 * np.sqrt(p.gamma), 1.2 * abs(z0[1]))
+        r = np.sqrt(p.gamma)                          # distance from saddle to a minimum
+        xmax = max(r, 1.2 * abs(z0[0]))
+        ymax = max(1.6 * r, 1.2 * abs(z0[1]))
         X, Y = np.meshgrid(np.linspace(-xmax, xmax, 80), np.linspace(-ymax, ymax, 80))
         self.ax.plot_surface(X, Y, p.peek_f((X, Y)), cmap="viridis", alpha=0.45, linewidth=0)
         self.ax.set_xlabel("x"); self.ax.set_ylabel("y"); self.ax.set_zlabel("f")
