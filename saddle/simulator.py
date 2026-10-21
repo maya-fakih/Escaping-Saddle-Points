@@ -73,12 +73,15 @@ class Simulator:
     # ------------------------------------------------------------------
     def _draw_surface(self):
         """Draw f once. The box shows the saddle, both minima and the start point.
-        It is scaled with gamma: the minima sit at y = +-sqrt(gamma), so for a small
-        gamma (S3) a fixed box would make the whole saddle look flat."""
+        It is scaled with the problem: for the assignment the minima sit at
+        y = +-sqrt(gamma), so for a small gamma (S3) a fixed box would make the
+        whole saddle look flat."""
         p, z0 = self.algo.problem, self.algo.z0
-        r = np.sqrt(p.gamma)                          # distance from saddle to a minimum
+        r = p.scale                                   # distance from saddle to a minimum
         xmax = max(r, 1.2 * abs(z0[0]))
         ymax = max(1.6 * r, 1.2 * abs(z0[1]))
+        if p.label == "star saddle":                  # minima on the diagonals: square box
+            xmax = ymax = max(xmax, ymax)
         X, Y = np.meshgrid(np.linspace(-xmax, xmax, 80), np.linspace(-ymax, ymax, 80))
         self.ax.plot_surface(X, Y, p.peek_f((X, Y)), cmap="viridis", alpha=0.45, linewidth=0)
         self.ax.set_xlabel("x"); self.ax.set_ylabel("y"); self.ax.set_zlabel("f")
@@ -125,7 +128,7 @@ class Simulator:
         P = np.array(a.path)
         self.path_line.set_data_3d(P[:, 0], P[:, 1], p.peek_f((P[:, 0], P[:, 1])))
         self.dot.set_data_3d([a.z[0]], [a.z[1]], [p.peek_f(a.z)])
-        self.ax.set_title(f"{a.name}   gamma = {p.gamma}   start = ({a.z0[0]:g}, {a.z0[1]:g})")
+        self.ax.set_title(f"{a.name}   {p.label}   start = ({a.z0[0]:g}, {a.z0[1]:g})")
         self.info.set_text(self.dashboard_text())
         self.fig.canvas.draw_idle()
 
