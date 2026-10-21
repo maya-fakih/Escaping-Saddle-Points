@@ -57,7 +57,7 @@ class Simulator:
         y = 0.96
         h_radio = 0.034 * len(names) + 0.02            # grows with the number of methods
         self.fig.text(L, y, "Algorithm", fontsize=10, weight="bold", va="bottom")
-        y -= h_radio
+        y -= h_radio + 0.008                            # small gap under the title
         self.radio = RadioButtons(self.fig.add_axes([L, y, W, h_radio]),
                                   names, active=names.index(first))
 
