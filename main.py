@@ -90,7 +90,8 @@ def visual(args, build, names):
         return
     for target in sorted(args.frames):
         while sim.algo.k < target and not sim.algo.done:
-            sim.advance()
+            sim.algo.step()                  # step without redrawing: much faster
+        sim.redraw()
         out = f"frame_{first}_{args.case}_{sim.algo.k}.png"
         sim.save(out)
         print("saved", out)
