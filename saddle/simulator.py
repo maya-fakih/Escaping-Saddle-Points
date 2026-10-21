@@ -14,6 +14,10 @@ Window layout (figure coordinates go from 0 to 1, left to right and bottom to to
         - numbers at the current point: k, z, f, f*, gradient, Hessian
           ("n/a" if the method does not use it) and the work Nf / Ng / NH
 
+Play pauses by itself the first time the point reaches a real minimum (the
+success test in saddle/metrics.py). The method itself does not stop there (the
+assignment runs all K updates); press Play or Step to keep going.
+
 Usage from code:
     sim = Simulator(build, ["gd", "pgd"], "gd")   # build(name) -> a fresh Algorithm
     sim.show()
@@ -21,6 +25,8 @@ Usage from code:
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, RadioButtons, Slider
+
+from saddle.metrics import at_minimum
 
 PANEL_LEFT, PANEL_WIDTH = 0.76, 0.22     # the dashboard column
 
@@ -31,6 +37,7 @@ class Simulator:
         self.build = build
         self.algo = build(first)
         self.playing = False
+        self.reached = None            # k where the point first reached a minimum
         self.fig = plt.figure(figsize=(15, 8.5))
 
         # ---- left 3/4: the 3D world ----
@@ -98,11 +105,16 @@ class Simulator:
         if self.playing:
             self.toggle_play()
         self.algo = self.build(name)
+        self.reached = None
         self.redraw()
 
     def advance(self):
         """One update of the algorithm, then refresh the picture."""
         self.algo.step()
+        if self.reached is None and at_minimum(self.algo.problem, self.algo.z):
+            self.reached = self.algo.k
+            if self.playing:
+                self.toggle_play()             # pause once, so you see where it arrived
         if self.algo.done and self.playing:
             self.toggle_play()
         self.redraw()
@@ -123,6 +135,7 @@ class Simulator:
         if self.playing:
             self.toggle_play()
         self.algo.reset()
+        self.reached = None
         self.redraw()
 
     # ------------------------------------------------------------------
@@ -161,6 +174,8 @@ class Simulator:
             lines += ["Hessian = n/a", "  (method does not use it)"]
         nf, ng, nh = a.counts
         lines += ["", "work so far:", f"  Nf={nf}  Ng={ng}  NH={nh}"]
+        if self.reached is not None:
+            lines += ["", f"reached a minimum at k={self.reached}"]
         if a.failed_at is not None:
             lines += ["", f"line search failed at k={a.failed_at}"]
         return "\n".join(lines)
