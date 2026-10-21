@@ -16,6 +16,16 @@ These checks use the uncounted peek_* functions, so they do not add to Nf/Ng/NH.
 import numpy as np
 
 
+def at_minimum(P, z):
+    """True when z passes the success test: gap <= 1e-4, ||grad|| <= 1e-5 and
+    no negative curvature. (A small gradient alone is NOT enough: it is small at
+    the saddle too.)"""
+    q = (P.peek_f(z) - P.fstar) / (0.0 - P.fstar)
+    if q > 1e-4 or np.linalg.norm(P.peek_grad(z)) > 1e-5:
+        return False
+    return np.linalg.eigvalsh(P.peek_hess(z))[0] >= -1e-4
+
+
 def evaluate(algo):
     P = algo.problem
     Z = np.array(algo.path)
@@ -27,13 +37,7 @@ def evaluate(algo):
     hit = np.nonzero(f <= fs - 0.1 * delta)[0]
     k_esc = int(hit[0]) if len(hit) else None
 
-    k_succ = None
-    for k in np.nonzero(q <= 1e-4)[0]:
-        g = P.peek_grad(Z[k])
-        lam_min = np.linalg.eigvalsh(P.peek_hess(Z[k]))[0]
-        if np.linalg.norm(g) <= 1e-5 and lam_min >= -1e-4:
-            k_succ = int(k)
-            break
+    k_succ = next((int(k) for k in np.nonzero(q <= 1e-4)[0] if at_minimum(P, Z[k])), None)
 
     nf, ng, nh = algo.counts
     return dict(updates=algo.k, k_esc=k_esc, k_succ=k_succ, z=Z[-1], f=f[-1], q=q[-1],
