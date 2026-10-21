@@ -40,7 +40,7 @@ Can my modification improve escape from a saddle? When does it help, when does i
     ├── main.py                   # what make run calls (visual or headless)
     ├── saddle/
     │   ├── benchmark.py          # f, gradient, Hessian, with Nf/Ng/NH counters
-    │   ├── cases.py              # S1-S5 and the default parameters
+    │   ├── cases.py              # default parameters (+ S1-S5, used by the tests)
     │   ├── metrics.py            # escape / success iteration, gap, work for one run
     │   ├── simulator.py          # the 3D window + dashboard
     │   └── algorithms/
@@ -80,11 +80,12 @@ and **not merged back**; each branch has a test that checks only its method.
     make run visual                 # 3D window, pick the method in the window
     make run headless ALG=all       # no window, prints a results table
 
-Settings (all optional): `ALG` (gd, pgd, gdnc, probe, probe_nesterov, probe_walk, learned_step or all), `FUNC` (assignment or star), `CASE` (S1..S5), `GAMMA`,
-`X0`, `Y0` (override the case), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
+Settings (all optional): `ALG` (gd, pgd, gdnc, probe, probe_nesterov, probe_walk, learned_step or all), `FUNC` (assignment or star), `GAMMA` (> 0, default 1;
+headless takes a list like `GAMMA="1 0.1 0.01"`), `X0`, `Y0` (start, default (0.05, 1e-8)), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
 (steps per second in the window). Example:
 
-    make run headless ALG=pgd CASE=S3 SEED=4 K=500
+    make run headless ALG=pgd GAMMA=0.01 SEED=4 K=500
+    make run headless GAMMA="1 0.1 0.01 0.001"
     make run visual ALG=gdnc GAMMA=0.5 X0=0.3 Y0=0 SPEED=20
     make run headless FUNC=star X0=0 Y0=0
 
