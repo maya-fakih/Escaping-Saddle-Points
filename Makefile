@@ -5,7 +5,8 @@
 #   make test                    run the tests on this branch
 #
 # Every setting can be changed on the command line, e.g.
-#   make run headless ALG=pgd CASE=S3 SEED=4 K=500
+#   make run headless ALG=pgd GAMMA=0.01 SEED=4 K=500
+#   make run headless GAMMA="1 0.1 0.01 0.001"     (one table per gamma)
 #   make run visual ALG=gdnc GAMMA=0.5 X0=0.3 Y0=0 SPEED=20
 #   make run headless FUNC=star X0=0 Y0=0       (the harder star saddle)
 # ---------------------------------------------------------------------------
@@ -13,13 +14,12 @@
 VENV ?= ../venv
 PY   := $(VENV)/bin/python
 
-# settings (empty = use the default from saddle/cases.py)
+# settings (defaults from the assignment; GAMMA must be > 0)
 ALG    ?= all
 FUNC   ?= assignment
-CASE   ?= S1
-GAMMA  ?=
-X0     ?=
-Y0     ?=
+GAMMA  ?= 1
+X0     ?= 0.05
+Y0     ?= 1e-8
 K      ?= 3000
 SEED   ?= 0
 G_TRIG ?= 1e-3
@@ -27,9 +27,8 @@ R      ?= 1e-2
 T      ?= 20
 SPEED  ?= 5
 
-ARGS := --alg $(ALG) --func $(FUNC) --case $(CASE) --k $(K) --seed $(SEED) --g-trig $(G_TRIG) \
-        --r $(R) --t $(T) --speed $(SPEED) \
-        $(if $(GAMMA),--gamma $(GAMMA)) $(if $(X0),--x0 $(X0)) $(if $(Y0),--y0 $(Y0))
+ARGS := --alg $(ALG) --func $(FUNC) --gamma $(GAMMA) --x0 $(X0) --y0 $(Y0) --k $(K) --seed $(SEED) --g-trig $(G_TRIG) \
+        --r $(R) --t $(T) --speed $(SPEED)
 
 # "make run headless" -> headless; "make run" or "make run visual" -> visual
 MODE := $(if $(filter headless,$(MAKECMDGOALS)),headless,visual)
