@@ -8,15 +8,16 @@ visual   : opens the 3D simulator; pick the method in the window.
 headless : no window; runs the method(s) to the end and prints a results table.
 
 Every setting is a parameter. --case fills in gamma and the start point from the
-assignment; --gamma / --x0 / --y0 override it. Each method only receives the
-parameters it actually has (P-GD takes seed, r, T; GD takes none of those).
+assignment; --gamma / --x0 / --y0 override it. --func star swaps the assignment's
+function for the harder star saddle (see saddle/benchmark.py; gamma is ignored there).
+Each method only receives the parameters it actually has (P-GD takes seed, r, T; GD takes none of those).
 """
 import argparse
 import inspect
 import time
 
 from saddle.algorithms import available, load
-from saddle.benchmark import Benchmark
+from saddle.benchmark import FUNCTIONS
 from saddle.cases import CASES, K, G_TRIG, R, T
 from saddle.metrics import evaluate
 
@@ -26,6 +27,7 @@ def parse():
     ap.add_argument("mode", choices=["visual", "headless"])
     ap.add_argument("--alg", default="all", help="a method on this branch, or 'all'")
     ap.add_argument("--case", default="S1", choices=CASES)
+    ap.add_argument("--func", default="assignment", choices=FUNCTIONS, help="which function")
     ap.add_argument("--gamma", type=float, help="overrides the case's gamma")
     ap.add_argument("--x0", type=float, help="overrides the case's start x")
     ap.add_argument("--y0", type=float, help="overrides the case's start y")
@@ -51,13 +53,13 @@ def builder(args):
         cls = load(name)
         accepted = inspect.signature(cls.__init__).parameters
         kwargs = {key: val for key, val in settings.items() if key in accepted}
-        return cls(Benchmark(gamma), z0, **kwargs)
+        return cls(FUNCTIONS[args.func](gamma), z0, **kwargs)
 
-    return build, gamma, z0
+    return build, z0
 
 
-def headless(build, names, gamma, z0):
-    print(f"gamma = {gamma}, start = {z0}\n")
+def headless(build, names, z0):
+    print(f"{build(names[0]).problem.label}, start = {z0}\n")
     head = f"{'method':<18}{'updates':>8}{'k_esc':>8}{'k_succ':>8}{'final f':>14}" \
            f"{'gap q':>11}{'Nf':>7}{'Ng':>7}{'NH':>6}{'time (s)':>10}   final z"
     print(head)
@@ -104,9 +106,9 @@ def main():
         raise SystemExit("No methods on this branch. Try: git checkout all-methods")
     for n in names:
         load(n)                              # clear error message if a name is wrong
-    build, gamma, z0 = builder(args)
+    build, z0 = builder(args)
     if args.mode == "headless":
-        headless(build, names, gamma, z0)
+        headless(build, names, z0)
     else:
         visual(args, build, names)
 
