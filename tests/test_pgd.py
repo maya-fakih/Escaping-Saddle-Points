@@ -34,7 +34,7 @@ class TestPGD(unittest.TestCase):
         a = run("S3", 0, 3000, T=20)
         self.assertTrue(np.all(np.diff(a.kicks) >= 20))
 
-    def test_kick_stays_inside_radius_r(self):
+    def test_kicks_right_away_on_the_saddle(self):
         P = Benchmark(1.0)
         a = PGD(P, (0.0, 0.0), max_iters=1, seed=0, r=1e-2)
         before = P.nf
