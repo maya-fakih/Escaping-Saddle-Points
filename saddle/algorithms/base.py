@@ -9,6 +9,8 @@ update(), which says how to get from the current z to the next one.
 Because everything moves one step at a time, the simulator can play it,
 pause it, or advance it by hand.
 """
+import time
+
 import numpy as np
 
 ARMIJO = 1e-4      # sufficient-decrease constant (assignment)
@@ -36,7 +38,12 @@ class Algorithm:
         self.done = False
         self.failed_at = None         # iteration where the line search failed, if ever
         self.probe_log = []           # probe rounds: (k, outcome); stays empty if no probes
+        self.clock = 0.0              # optimizer time so far, in seconds
         self.setup()
+        # what it cost to reach each point of the path, so we can read off the work
+        # and the time "up to success" after the run (the assignment asks for both)
+        self.work = [self.counts]     # (Nf, Ng, NH) after reaching path[k]
+        self.times = [0.0]            # optimizer seconds after reaching path[k]
 
     def setup(self):
         """Children put their own starting state here (seeds, counters, ...)."""
@@ -51,9 +58,14 @@ class Algorithm:
         """Do one update (if we are not finished) and return the new point."""
         if self.done:
             return self.z
-        if self.update():
+        t0 = time.perf_counter()
+        ok = self.update()
+        self.clock += time.perf_counter() - t0       # only the method's own work is timed
+        if ok:
             self.k += 1
             self.path.append(self.z.copy())
+            self.work.append(self.counts)
+            self.times.append(self.clock)
             if self.k >= self.max_iters:
                 self.done = True
         else:

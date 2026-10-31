@@ -6,7 +6,7 @@ Checks for the shared pieces on main: the benchmark's math and the base class.
 import unittest
 import numpy as np
 
-from saddle.benchmark import Benchmark, Star
+from saddle.benchmark import Benchmark, RotatedSaddle, Star
 from saddle.algorithms.base import Algorithm
 from saddle.metrics import probe_rounds
 
@@ -60,6 +60,39 @@ class TestStar(unittest.TestCase):
         r = 1e-2                                                     # axis probes all go up
         for u in ([r, 0], [-r, 0], [0, r], [0, -r]):
             self.assertGreater(P.peek_f(np.array(u)), 0)
+
+
+class TestRotatedSaddle(unittest.TestCase):
+    def test_plain_is_the_assignment_function(self):
+        P, B = RotatedSaddle.plain(0.1), Benchmark(0.1)
+        z = np.array([0.3, -0.7])
+        self.assertEqual(P.peek_f(z), B.peek_f(z))
+        np.testing.assert_allclose(P.peek_grad(z), B.peek_grad(z))
+        np.testing.assert_allclose(P.peek_hess(z), B.peek_hess(z))
+
+    def test_derivatives_in_every_version(self):
+        h = 1e-6
+        for P in (RotatedSaddle.rotated_2d(0.1, 45), RotatedSaddle.coupled(10, 0.01),
+                  RotatedSaddle.random(10, 0.01)):
+            z = np.random.default_rng(1).standard_normal(P.n) * 0.3
+            num_g = [(P.peek_f(z + h * e) - P.peek_f(z - h * e)) / (2 * h) for e in np.eye(P.n)]
+            np.testing.assert_allclose(P.peek_grad(z), num_g, atol=1e-8)
+            num_h = np.column_stack([(P.peek_grad(z + h * e) - P.peek_grad(z - h * e)) / (2 * h)
+                                     for e in np.eye(P.n)])
+            np.testing.assert_allclose(P.peek_hess(z), num_h, atol=1e-6)
+            for m in P.minima:
+                self.assertAlmostEqual(P.peek_f(m), P.fstar)
+
+    def test_coupled_hessian_is_banded(self):
+        H = RotatedSaddle.coupled(10, 0.1).peek_hess(np.zeros(10))
+        i, j = np.indices(H.shape)
+        np.testing.assert_allclose(H[np.abs(i - j) > 1], 0, atol=1e-15)
+
+    def test_starts(self):
+        P = RotatedSaddle.rotated_2d(1.0, 0)
+        np.testing.assert_allclose(P.start("close"), [0.05, 1e-8])
+        np.testing.assert_allclose(P.start("near_min"), [0.05, 1 + 1e-4])
+        np.testing.assert_allclose(P.start("on"), [0, 0])
 
 
 class Halfway(Algorithm):
