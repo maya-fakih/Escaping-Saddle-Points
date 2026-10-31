@@ -277,10 +277,12 @@ def main():
                     help="which method rows to run (0-based, see METHODS)")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(HERE), "results"))
     ap.add_argument("--no-pictures", action="store_true", help="skip the 2D pictures")
+    ap.add_argument("--seeds", type=int, default=len(SEEDS),
+                    help="runs per random method (seeds 0..N-1); 1 = one run per cell")
     args = ap.parse_args()
 
     global N_BIG
-    seeds, iters = SEEDS, K
+    seeds, iters = SEEDS[:args.seeds], K
     if args.quick:
         N_BIG, seeds, iters = 10, SEEDS[:2], 50
         args.gammas = [0.1]
