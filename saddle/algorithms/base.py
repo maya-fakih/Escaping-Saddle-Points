@@ -109,3 +109,18 @@ class Algorithm:
                 return z_new, f_new
             t *= 0.5
         return None, None
+
+
+def turned_axes(n, angle):
+    """The n coordinate axes, turned by `angle` (radians), as the columns of a matrix.
+
+    WHY: the probe methods look along the axes, and when every look fails they try
+    again with the axes turned a little. In 2D that is the usual rotation matrix.
+    In n dimensions we turn each pair of axes (1,2), (3,4), ... by the same angle
+    (if n is odd the last axis stays as it is). With angle = 0 this is the identity.
+    """
+    c, s = np.cos(angle), np.sin(angle)
+    U = np.eye(n)
+    for i in range(0, n - 1, 2):
+        U[i:i + 2, i:i + 2] = [[c, -s], [s, c]]
+    return U
