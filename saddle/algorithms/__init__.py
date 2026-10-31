@@ -16,7 +16,7 @@ NOT_METHODS = {"base"}
 
 # The methods the window's picker shows, in this order. None = every method on the branch.
 # (A branch with many methods can list only the ones being compared.)
-PICKER = None
+PICKER = ["gd", "pgd", "gdnc", "jin_pgd", "probe_nesterov", "ldh", "ldh_guessed"]
 
 
 def available():

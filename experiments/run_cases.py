@@ -1,23 +1,21 @@
 """
-The full test grid: every method on every test, written into one Excel file.
+The 27 test cases: every compared method on 3 functions x 3 gammas x 3 starts.
 
-    python experiments/run_grid.py                  # everything (long: run it on a big machine)
-    python experiments/run_grid.py --quick          # a tiny slice, to check that it runs
-    python experiments/run_grid.py --workers 8      # use 8 CPU cores
-    python experiments/run_grid.py --functions 2d 2d_rot --gammas 0.1   # only part of it
+    python experiments/run_cases.py                 # everything (2D is fast, 100D takes a while)
+    python experiments/run_cases.py --quick         # a tiny slice, to check that it runs
+    python experiments/run_cases.py --workers 8     # use 8 CPU cores
+    python experiments/run_cases.py --functions 2d 2d_rot      # only part of it
 
-WHAT IT RUNS (the same layout as test-plan/test_plan.xlsx)
+WHAT IT RUNS
   Columns, nested:  function  ->  gamma  ->  start
-      functions: 2D benchmark, 2D turned 45 degrees, 100D neighbours coupled,
-                 100D random rotation           (see RotatedSaddle in saddle/benchmark.py)
+      functions: 2D benchmark, 2D turned 45 degrees (the worst case for per-axis steps),
+                 100D with a random rotation    (see RotatedSaddle in saddle/benchmark.py)
       gammas:    1, 0.1, 0.01                   (the assignment's S1, S2, S3 values)
-      starts:    far, close, on saddle, near minimum
-  Rows: the METHODS list below: the assignment's baselines (with every Question 4
-  value), the paper's PGD, each part of the proposed method alone, the parts combined,
-  and the earlier variants.
-  The assignment's cases are cells of this grid: S1 = 2D, gamma 1, close;
-  S2 = 2D, gamma 0.1, close; S3 = 2D, gamma 0.01, close; S4 = 2D, gamma 1, on saddle;
-  S5 = 2D, gamma 1, near minimum.
+      starts:    near the saddle (0.05, 1e-8), exactly on it, near a minimum
+  Rows: GD, P-GD, GD-NC (assignment defaults), Jin et al. PGD, Probe + Nesterov,
+        LDH (the proposed method), LDH with a guessed B.
+  (100d_band and the "far" start are still available with --functions / --starts.)
+  The assignment's own tables (S1-S5, Question 4) are made by run_hw.py.
 
 THE RULES (the assignment's, page 3)
   K = 3000 updates, no early stop; random methods run 10 times with seeds 0..9,
@@ -26,11 +24,11 @@ THE RULES (the assignment's, page 3)
   numbers are averaged over the runs that reach them, final gap and work over all runs.
 
 WHAT IT WRITES (into results/)
-  grid_runs.csv       one line per run (every number, so nothing is lost)
-  grid_results.xlsx   one sheet per measure, in the test-plan layout:
+  cases_runs.csv      one line per run (every number, so nothing is lost)
+  cases_results.xlsx  one sheet per measure, merged headers function -> gamma -> start:
                       Success, Escape k_esc, Success k_succ, Time to success, Final gap,
                       Work Nf-Ng-NH, Work to success, Rounds
-  If grid_runs.csv already has some runs, they are reused (so a stopped run can resume).
+  If cases_runs.csv already has some runs, they are reused (so a stopped run can resume).
 """
 import argparse
 import csv
@@ -63,59 +61,26 @@ FUNCTIONS = {   # key: (title in the table, how to build it for a gamma)
     "100d_rand": ("100D, random rotation",               lambda g: RotatedSaddle.random(N_BIG, g, seed=0)),
 }
 GAMMAS = [1.0, 0.1, 0.01]
-STARTS = {"far": "Far", "close": "Close", "on": "On saddle", "near_min": "Near minimum"}
+STARTS = {"far": "Far", "close": "Near saddle", "on": "On saddle", "near_min": "Near minimum"}
+DEFAULT_FUNCTIONS = ["2d", "2d_rot", "100d_rand"]
+DEFAULT_STARTS = ["close", "on", "near_min"]
 
 # ----------------------------------------------------------------------------
 # The rows: (family, method, parameters shown, file in saddle/algorithms, settings, random?)
 # "Proposed method" rows all use the same class with some parts switched off.
 # ----------------------------------------------------------------------------
-OFF = dict(kick=False, penalty=False, learn_step=False)   # every other part off
 METHODS = [
     ("Assignment baselines", "GD", "backtracking", "gd", {}, False),
     ("Assignment baselines", "P-GD", "default: g_trig=1e-3, r=1e-2, T=20", "pgd", {}, True),
-    ("Assignment baselines", "P-GD", "g_trig = 1e-4", "pgd", dict(g_trig=1e-4), True),
-    ("Assignment baselines", "P-GD", "g_trig = 1e-2", "pgd", dict(g_trig=1e-2), True),
-    ("Assignment baselines", "P-GD", "r = 1e-3", "pgd", dict(r=1e-3), True),
-    ("Assignment baselines", "P-GD", "r = 5e-2", "pgd", dict(r=5e-2), True),
-    ("Assignment baselines", "P-GD", "T = 10", "pgd", dict(T=10), True),
-    ("Assignment baselines", "P-GD", "T = 50", "pgd", dict(T=50), True),
     ("Assignment baselines", "GD-NC", "default: g_trig=1e-3", "gdnc", {}, False),
-    ("Assignment baselines", "GD-NC", "g_trig = 1e-4", "gdnc", dict(g_trig=1e-4), False),
-    ("Assignment baselines", "GD-NC", "g_trig = 1e-2", "gdnc", dict(g_trig=1e-2), False),
     ("Literature", "Perturbed GD, Jin et al. 2017 (Algorithm 2)",
      "r=1e-2, g_thres=1e-3, t_thres=20, f_thres=1e-7", "jin_pgd", {}, True),
-    ("Proposed method: each part alone", "Learned per-axis step size (ρ = actual / predicted drop)",
-     "κ=0.5, ω=2", "proposed", dict(escape="none", **dict(OFF, learn_step="axes")), False),
-    ("Proposed method: each part alone", "Learned step size along B's eigen-directions (start 1/|λ|, then ρ)",
-     "b = 1, B re-measured every 20 updates", "proposed",
-     dict(escape="none", **dict(OFF, learn_step="curvature")), False),
-    ("Proposed method: each part alone", "Banded Hessian estimate, escape along its most negative direction",
-     "band b = 0 (diagonal)", "proposed", dict(band=0, escape="curvature", **OFF), False),
-    ("Proposed method: each part alone", "Banded Hessian estimate, escape along its most negative direction",
-     "band b = 1", "proposed", dict(band=1, escape="curvature", **OFF), False),
-    ("Proposed method: each part alone", "Banded Hessian estimate, escape along its most negative direction",
-     "band b = N-1 (full)", "proposed", dict(band="full", escape="curvature", **OFF), False),
-    ("Proposed method: each part alone", "Axis probes ±δ along every axis (2N probes)",
-     "δ = 1e-2", "proposed", dict(escape="axes", **OFF), False),
-    ("Proposed method: parts combined", "Banded Hessian + probe bag",
-     "b = 1, bag size m = 4", "proposed", dict(band=1, escape="bag", **OFF), False),
-    ("Proposed method: parts combined", "Banded Hessian + probe bag + capped uphill kick in a ball",
-     "kick radius r = 1e-2", "proposed", dict(band=1, escape="bag", kick=True, penalty=False,
-                                              learn_step=False), True),
-    ("Proposed method: parts combined", "Full proposed method: + fading direction penalty",
-     "p0 = 1e-4, β = 0.9", "proposed", dict(band=1, escape="bag", kick=True, penalty=True,
-                                             learn_step=False), True),
-    ("Proposed method: parts combined", "Full proposed method + learned step per axis",
-     "all parts on, steps per x, y, ...", "proposed",
-     dict(band=1, escape="bag", kick=True, penalty=True, learn_step="axes"), True),
-    ("Proposed method: parts combined", "Full proposed method + learned step along B's directions",
-     "all parts on (the default)", "proposed",
-     dict(band=1, escape="bag", kick=True, penalty=True, learn_step="curvature"), True),
-    ("Earlier variants", "Probe method (learned step + rotating axis probes)", "Oct 18 version",
-     "probe", {}, False),
-    ("Earlier variants", "Probe + Nesterov", "probe when stuck, Nesterov otherwise",
+    ("Earlier variant", "Probe + Nesterov", "probe when stuck, Nesterov otherwise",
      "probe_nesterov", {}, False),
-    ("Earlier variants", "Probe + walk", "flat probes: move and double δ", "probe_walk", {}, True),
+    ("Proposed method", "LDH: learned per-dimension steps + probes along B's m most negative directions",
+     "B measured (3 gradients), m = 4", "ldh", {}, True),
+    ("Proposed method", "LDH, guessed B: B learned from rho + neighbour steps, no eigen-solver",
+     "2 x 2 blocks, m = 4", "ldh_guessed", {}, True),
 ]
 
 FIELDS = ["row", "function", "gamma", "start", "seed", "updates", "k_esc", "k_succ", "t_succ",
@@ -292,9 +257,9 @@ def main():
     ap.add_argument("--quick", action="store_true",
                     help="tiny smoke test: 2 seeds, 50 updates, gamma 0.1, 10D instead of 100D")
     ap.add_argument("--workers", type=int, default=os.cpu_count(), help="CPU cores to use")
-    ap.add_argument("--functions", nargs="+", default=list(FUNCTIONS), choices=FUNCTIONS)
+    ap.add_argument("--functions", nargs="+", default=DEFAULT_FUNCTIONS, choices=FUNCTIONS)
     ap.add_argument("--gammas", nargs="+", type=float, default=GAMMAS)
-    ap.add_argument("--starts", nargs="+", default=list(STARTS), choices=STARTS)
+    ap.add_argument("--starts", nargs="+", default=DEFAULT_STARTS, choices=STARTS)
     ap.add_argument("--rows", nargs="+", type=int, default=list(range(len(METHODS))),
                     help="which method rows to run (0-based, see METHODS)")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(HERE), "results"))
@@ -307,13 +272,13 @@ def main():
         args.gammas = [0.1]
         args.out = os.path.join(args.out, "quick")
     os.makedirs(args.out, exist_ok=True)
-    csv_path = os.path.join(args.out, "grid_runs.csv")
-    xlsx_path = os.path.join(args.out, "grid_results.xlsx")
+    csv_path = os.path.join(args.out, "cases_runs.csv")
+    xlsx_path = os.path.join(args.out, "cases_results.xlsx")
 
     jobs = make_jobs(args.rows, args.functions, args.gammas, args.starts, seeds, iters)
     done = load_done(csv_path)
     todo = [j for j in jobs if (j[0], j[1], j[2], j[3], j[4]) not in done]
-    print(f"{len(jobs)} runs in this grid, {len(jobs) - len(todo)} already saved, "
+    print(f"{len(jobs)} runs in these cases, {len(jobs) - len(todo)} already saved, "
           f"{len(todo)} to go, on {args.workers} cores")
 
     new_file = not os.path.exists(csv_path)

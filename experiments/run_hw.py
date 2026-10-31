@@ -1,12 +1,17 @@
 """
 Only what the assignment asks for, in its one-table format.
 
-    python experiments/run_hw.py               # about 200 short runs, all 2D
+    python experiments/run_hw.py               # about 300 short runs, all 2D
     python experiments/run_hw.py --workers 4
+    python experiments/run_hw.py --pgd T=50 --gdnc g_trig=1e-4    # after Question 4
+
+--pgd / --gdnc: the configurations you CHOSE in Question 4. Section 4 of the assignment
+compares the proposed method on S1-S5 against GD and these two choices, so they get their
+own S1-S5 rows ("S3, chosen: T=50").
 
 WHAT IT RUNS
   Questions 1-3 and the comparison (section 4):  S1-S5  x  GD, P-GD, GD-NC (defaults),
-      Jin et al. PGD, and the proposed method (all parts on).
+      Jin et al. PGD, and the proposed method: LDH and LDH with a guessed B.
   Question 4 (on S2 only, one parameter at a time, the others at their defaults):
       P-GD   g_trig = 1e-4, 1e-2    r = 1e-3, 5e-2    T = 10, 50
       GD-NC  g_trig = 1e-4, 1e-2
@@ -34,7 +39,7 @@ sys.path.insert(0, HERE)
 from saddle.algorithms import load                 # noqa: E402
 from saddle.benchmark import RotatedSaddle         # noqa: E402
 from saddle.metrics import evaluate                # noqa: E402
-from run_grid import FIELDS, num, mean_sd          # noqa: E402
+from run_cases import FIELDS, num, mean_sd          # noqa: E402
 
 K = 3000
 SEEDS = list(range(10))
@@ -45,7 +50,9 @@ CASES = {"S1": (1.0, "close"), "S2": (0.1, "close"), "S3": (0.01, "close"),
 
 # The methods: (name in the table, file in saddle/algorithms, random?)
 METHODS = {"GD": ("gd", False), "P-GD": ("pgd", True), "GD-NC": ("gdnc", False),
-           "Jin et al. PGD": ("jin_pgd", True), "Proposed": ("proposed", True)}
+           "Jin et al. PGD": ("jin_pgd", True), "LDH (proposed)": ("ldh", True),
+           "LDH, guessed B": ("ldh_guessed", True)}
+CHOSEN = {"P-GD": {}, "GD-NC": {}}                  # filled from --pgd / --gdnc
 
 
 def experiments():
@@ -59,7 +66,21 @@ def experiments():
             rows.append(("S2", f"{key} = {v:g}", "P-GD", {key: v}))
     for v in (1e-4, 1e-2):                                 # Question 4, GD-NC
         rows.append(("S2", f"g_trig = {v:g}", "GD-NC", {"g_trig": v}))
+    for method, settings in CHOSEN.items():                # section 4: the chosen configs
+        if settings:
+            shown = ", ".join(f"{k}={v:g}" for k, v in settings.items())
+            for case in CASES:
+                rows.append((case, f"chosen: {shown}", method, dict(settings)))
     return rows
+
+
+def parse_settings(pairs):
+    """['T=50', 'r=0.05'] -> {'T': 50, 'r': 0.05}"""
+    out = {}
+    for pair in pairs or []:
+        key, value = pair.split("=")
+        out[key] = int(value) if key == "T" else float(value)
+    return out
 
 
 def one_run(job):
@@ -124,7 +145,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--workers", type=int, default=os.cpu_count(), help="CPU cores to use")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(HERE), "results"))
+    ap.add_argument("--pgd", nargs="+", metavar="KEY=VALUE",
+                    help="your chosen P-GD configuration from Question 4, e.g. T=50")
+    ap.add_argument("--gdnc", nargs="+", metavar="KEY=VALUE",
+                    help="your chosen GD-NC configuration from Question 4, e.g. g_trig=1e-4")
     args = ap.parse_args()
+    CHOSEN["P-GD"], CHOSEN["GD-NC"] = parse_settings(args.pgd), parse_settings(args.gdnc)
     os.makedirs(args.out, exist_ok=True)
 
     rows = experiments()
@@ -132,7 +158,7 @@ def main():
             for s in (SEEDS if METHODS[m][1] else SEEDS[:1])]
     print(f"{len(rows)} table rows, {len(jobs)} runs")
     t0 = time.time()
-    with Pool(args.workers) as pool:
+    with Pool(args.workers, initializer=_set_chosen, initargs=(CHOSEN,)) as pool:
         results = pool.map(one_run, jobs)
     print(f"done in {time.time() - t0:.0f} s")
 
@@ -149,6 +175,11 @@ def main():
     xlsx_path = os.path.join(args.out, "hw_results.xlsx")
     write_excel(xlsx_path, lines)
     print("wrote", csv_path, "and", xlsx_path)
+
+
+def _set_chosen(chosen):
+    """Worker processes need the same chosen configurations to rebuild the row list."""
+    CHOSEN.update(chosen)
 
 
 if __name__ == "__main__":
