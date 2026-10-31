@@ -20,6 +20,7 @@ FUNC   ?= assignment
 GAMMA  ?= 1
 X0     ?= 0.05
 Y0     ?= 1e-8
+ANGLE  ?= 0
 K      ?= 3000
 SEED   ?= 0
 G_TRIG ?= 1e-3
@@ -27,7 +28,7 @@ R      ?= 1e-2
 T      ?= 20
 SPEED  ?= 5
 
-ARGS := --alg $(ALG) --func $(FUNC) --gamma $(GAMMA) --x0 $(X0) --y0 $(Y0) --k $(K) --seed $(SEED) --g-trig $(G_TRIG) \
+ARGS := --alg $(ALG) --func $(FUNC) --gamma $(GAMMA) --x0 $(X0) --y0 $(Y0) --angle $(ANGLE) --k $(K) --seed $(SEED) --g-trig $(G_TRIG) \
         --r $(R) --t $(T) --speed $(SPEED)
 
 # "make run headless" -> headless; "make run" or "make run visual" -> visual
