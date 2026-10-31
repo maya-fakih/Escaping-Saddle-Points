@@ -49,7 +49,7 @@ COST
 """
 import numpy as np
 
-from saddle.algorithms.base import Algorithm
+from saddle.algorithms.base import Algorithm, turned_axes
 from saddle.cases import G_TRIG, R as R_DEFAULT
 
 
@@ -99,8 +99,7 @@ class ProbeWalk(Algorithm):
             self.turns = 0                        # how many times the axes were turned
 
         ang = self.turns * np.pi / (2 * self.R)
-        c, s = np.cos(ang), np.sin(ang)
-        axes = ([c, s], [-s, c])                  # x and y axes turned by ang
+        axes = turned_axes(len(self.z), ang).T    # the axes turned by ang, one per row
 
         lower, equal = [], []
         for u in axes:
