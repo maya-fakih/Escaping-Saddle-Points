@@ -54,6 +54,10 @@ def evaluate(algo):
     k_succ = next((int(k) for k in np.nonzero(q <= 1e-4)[0] if at_minimum(P, Z[k])), None)
 
     nf, ng, nh = algo.counts
+    # work and time spent up to the first success (None if it never succeeded)
+    w = algo.work[k_succ] if k_succ is not None else (None, None, None)
+    t_succ = algo.times[k_succ] if k_succ is not None else None
     return dict(updates=algo.k, k_esc=k_esc, k_succ=k_succ, z=Z[-1], f=f[-1], q=q[-1],
                 nf=nf, ng=ng, nh=nh, failed_at=algo.failed_at,
+                nf_succ=w[0], ng_succ=w[1], nh_succ=w[2], t_succ=t_succ,
                 **probe_rounds(algo.probe_log, k_succ))
