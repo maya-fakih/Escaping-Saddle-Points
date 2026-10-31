@@ -16,7 +16,7 @@ import argparse
 import inspect
 import time
 
-from saddle.algorithms import available, load
+from saddle.algorithms import available, load, shown
 from saddle.benchmark import FUNCTIONS, RotatedSaddle
 from saddle.cases import K, G_TRIG, R, T
 from saddle.metrics import evaluate
@@ -105,7 +105,8 @@ def visual(args, build, names):
     from saddle.simulator import Simulator
 
     first = names[0]
-    sim = Simulator(build, available(), first, args.gamma[0], (args.x0, args.y0),
+    picker = shown() if first in shown() else shown() + [first]
+    sim = Simulator(build, picker, first, args.gamma[0], (args.x0, args.y0),
                     speed=args.speed, angle=args.angle)
     if args.frames is None:
         sim.show()
@@ -121,7 +122,7 @@ def visual(args, build, names):
 
 def main():
     args = parse()
-    names = available() if args.alg == "all" else [args.alg]
+    names = shown() if args.alg == "all" else [args.alg]
     if not names:
         raise SystemExit("No methods on this branch. Try: git checkout all-methods")
     for n in names:
