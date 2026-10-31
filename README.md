@@ -8,8 +8,11 @@ Diagonal Hessian)**: step sizes learned per dimension from measured function dec
 and, when stuck, a few probes aimed by a cheap tridiagonal approximation of the Hessian.
 No Hessian is ever computed.
 
-> **Headline result.** TODO (one sentence with the main number, e.g. steps to the
-> minimum on S2 for LDH vs P-GD vs GD-NC, and the work it took).
+> **Headline result.** On the assignment function, LDH reaches the minimum in 7-13
+> updates for γ ≤ 0.1, against 36-180 for GD-NC and 89-482 for P-GD, near the saddle or
+> exactly on it, with no Hessian and less total work to success. When the function is
+> turned 45° or rotated in 100 dimensions, the per-axis step sizes lose that edge: GD-NC
+> and P-GD are then faster, and LDH's work grows with the dimension.
 
 **Contents:**
 [The problem](#the-problem) ·
@@ -80,25 +83,83 @@ negative curvature; time to success; final gap $q_K$; work $N_f / N_g / N_H$.
 
 All numbers: `make hw` → `results/hw_results.xlsx` (the assignment's one-table format).
 
-> TODO: paste the table for each question from `results/hw_results.xlsx`.
+"Work to success" counts the evaluations up to $k_{succ}$; the whole-run counts (3000
+updates every time, as the assignment asks) are in the Excel file. Mean ± sample sd over
+the 10 seeds for P-GD, Jin et al. and LDH; NR = never reached.
 
 ### Question 1. How does curvature affect escape? (S1-S3)
 
-**Table.** TODO (S1, S2, S3 rows for GD, P-GD, GD-NC)
+| Setting | Method | Success | k_esc | k_succ | Final gap | Work to success Nf / Ng / NH |
+|---|---|---|---|---|---|---|
+| S1, default | GD | 1/1 | 25 | 29 | 0.0e+00 | 32 / 29 / 0 |
+| S1, default | P-GD | 10/10 | 7 ± 1 | 14 ± 1 | 4.4e-17 ± 9.4e-17 | 18 ± 2 / 16 ± 1 / 0 |
+| S1, default | GD-NC | 1/1 | 2 | 2 | 1.6e-15 | 3 / 2 / 1 |
+| S1, default | Jin et al. PGD | 10/10 | 7 ± 1 | 14 ± 1 | 1.1e-15 ± 3.3e-15 | 18 ± 2 / 16 ± 1 / 0 |
+| S2, default | GD | 1/1 | 166 | 218 | -1.7e-16 | 219 / 218 / 0 |
+| S2, default | P-GD | 10/10 | 31 ± 5 | 88 ± 16 | 1.3e-04 ± 2.5e-04 | 92 ± 17 / 92 ± 17 / 0 |
+| S2, default | GD-NC | 1/1 | 2 | 37 | -1.7e-16 | 40 / 37 / 22 |
+| S2, default | Jin et al. PGD | 8/10 | 32 ± 6 | 82 ± 10 | 1.2e-07 ± 1.7e-07 | 85 ± 10 / 85 ± 10 / 0 |
+| S3, default | GD | 1/1 | 1474 | 1848 | 6.8e-16 | 1849 / 1848 / 0 |
+| S3, default | P-GD | 10/10 | 141 ± 102 | 656 ± 206 | 3.5e-03 ± 4.8e-03 | 691 ± 216 / 691 ± 216 / 0 |
+| S3, default | GD-NC | 1/1 | 2 | 180 | 9.5e-16 | 184 / 180 / 179 |
+| S3, default | Jin et al. PGD | 0/10 | 72 ± 10 (2/10 escape) | NR | 8.7e-01 ± 3.2e-01 | NR / NR / NR |
 
-**What we see.** TODO (link the trend to the escape estimate in [The problem](#the-problem))
+**What we see.**
+- **GD** escapes ever more slowly as $\gamma$ shrinks: 25, 166, 1474 updates. Near the
+  saddle $y$ only grows by a factor $1 + t\gamma$ per step, so the escape time grows
+  roughly like $1/\gamma$ (see [The problem](#the-problem)). Success follows: 29, 218, 1848.
+- **P-GD** escapes 3-10× sooner than GD (7, 31, 141): the kick replaces the tiny
+  $y_0 = 10^{-8}$ by something of size $r = 10^{-2}$, so there is much less to grow. It
+  still needs 14, 88, 656 updates to succeed, with a large spread at S3 (± 206), because
+  after escaping it walks to the minimum with plain GD steps and keeps kicking there.
+- **GD-NC** escapes in 2 updates in every case: the negative-curvature step does not care
+  how small $y$ is. Success still slows down (2, 37, 180): the minimum at $(0, \sqrt\gamma)$
+  has curvature only $2\gamma$ along $y$, so the last part of the trip is a slow GD walk.
+  It pays with Hessians: 1, 22, 179 to success.
+- **Jin et al.** matches P-GD on S1-S2 but fails at S3 (0/10): after a kick $f$ drops by
+  less than $f_{thres} = 10^{-7}$ in $t_{thres}$ steps, so its stop rule calls the saddle a
+  minimum. Weak curvature is exactly where that rule breaks.
 
 ### Question 2. What happens exactly at the saddle? (S4 vs S1)
 
-**Table.** TODO
+| Setting | Method | Success | k_esc | k_succ | Final gap | Work to success Nf / Ng / NH |
+|---|---|---|---|---|---|---|
+| S1, default | GD | 1/1 | 25 | 29 | 0.0e+00 | 32 / 29 / 0 |
+| S1, default | P-GD | 10/10 | 7 ± 1 | 14 ± 1 | 4.4e-17 ± 9.4e-17 | 18 ± 2 / 16 ± 1 / 0 |
+| S1, default | GD-NC | 1/1 | 2 | 2 | 1.6e-15 | 3 / 2 / 1 |
+| S1, default | Jin et al. PGD | 10/10 | 7 ± 1 | 14 ± 1 | 1.1e-15 ± 3.3e-15 | 18 ± 2 / 16 ± 1 / 0 |
+| S4, default | GD | 0/1 | NR | NR | 1.0e+00 | NR / NR / NR |
+| S4, default | P-GD | 10/10 | 6 ± 1 | 13 ± 1 | 4.4e-17 ± 9.4e-17 | 18 ± 2 / 15 ± 1 / 0 |
+| S4, default | GD-NC | 1/1 | 1 | 1 | 0.0e+00 | 2 / 1 / 1 |
+| S4, default | Jin et al. PGD | 10/10 | 6 ± 1 | 13 ± 1 | 1.1e-15 ± 3.3e-15 | 18 ± 2 / 15 ± 1 / 0 |
 
-**What we see.** TODO (which update creates motion away from the saddle; who fails)
+**What we see.**
+- **GD fails**: at $(0, 0)$ the gradient is exactly zero, so GD never moves (gap stays 1).
+- **P-GD and Jin et al.**: the random kick is what creates motion; then GD amplifies the
+  $y$ part. 13 updates to success, about the same as from the nearby S1 start (14), since
+  the kick erases the difference between "near" and "on".
+- **GD-NC**: the negative-curvature step itself creates the motion, 1 update.
 
 ### Question 3. What happens near a minimum? (S5)
 
-**Table.** TODO (no escape column, as asked)
+| Setting | Method | Success | k_succ | Final gap | Work to success Nf / Ng / NH |
+|---|---|---|---|---|---|
+| S5, default | GD | 1/1 | 3 | 8.9e-16 | 5 / 3 / 0 |
+| S5, default | P-GD | 10/10 | 4 ± 1 | 4.4e-17 ± 9.4e-17 | 8 ± 1 / 6 ± 1 / 0 |
+| S5, default | GD-NC | 1/1 | 3 | 8.9e-16 | 5 / 3 / 2 |
+| S5, default | Jin et al. PGD | 10/10 | 4 ± 1 | 4.0e-08 ± 0.0e+00 | 8 ± 1 / 6 ± 1 / 0 |
 
-**What we see.** TODO (unnecessary perturbations, final gap, extra work)
+**What we see.**
+- Everyone succeeds in 3-4 updates; the start is already in the right basin.
+- **P-GD keeps kicking at the minimum**: the gradient there is below $g_{trig}$, so every
+  $T$ updates it perturbs. Over the 3000 updates that costs about 490 extra $f$
+  evaluations compared with GD (3491 vs 3002) for nothing; the final gap stays tiny
+  only because GD pulls it back each time.
+- **GD-NC** computes a Hessian at almost every update near the minimum (2999), because the
+  gradient is small there; the Hessian has no negative eigenvalue, so all that work is
+  wasted.
+- **Jin et al.** stops after its first useless kick (25 $f$ in total): here its stop rule
+  saves work.
 
 ### Question 4. Effect of the parameters (S2)
 
@@ -106,13 +167,33 @@ One parameter at a time, the others at their defaults: P-GD $g_{trig} \in \{10^{
 10^{-3}, 10^{-2}\}$, $r \in \{10^{-3}, 10^{-2}, 5\cdot10^{-2}\}$, $T \in \{10, 20, 50\}$;
 GD-NC $g_{trig} \in \{10^{-4}, 10^{-3}, 10^{-2}\}$.
 
-**Table.** TODO
+| Setting | Method | Success | k_esc | k_succ | Final gap | Work to success Nf / Ng / NH |
+|---|---|---|---|---|---|---|
+| S2, default | P-GD | 10/10 | 31 ± 5 | 88 ± 16 | 1.3e-04 ± 2.5e-04 | 92 ± 17 / 92 ± 17 / 0 |
+| S2, default | GD-NC | 1/1 | 2 | 37 | -1.7e-16 | 40 / 37 / 22 |
+| S2, g_trig = 0.0001 | P-GD | 10/10 | 32 ± 6 | 111 ± 14 | 7.0e-05 ± 1.3e-04 | 115 ± 14 / 115 ± 14 / 0 |
+| S2, g_trig = 0.01 | P-GD | 10/10 | 30 ± 4 | 103 ± 43 | 3.1e-06 ± 4.7e-06 | 109 ± 45 / 109 ± 45 / 0 |
+| S2, r = 0.001 | P-GD | 10/10 | 54 ± 4 | 110 ± 6 | 1.5e-06 ± 4.6e-06 | 115 ± 6 / 115 ± 6 / 0 |
+| S2, r = 0.05 | P-GD | 10/10 | 15 ± 6 | 243 ± 199 | 2.9e-03 ± 5.3e-03 | 255 ± 209 / 255 ± 209 / 0 |
+| S2, T = 10 | P-GD | 10/10 | 28 ± 2 | 268 ± 194 | 2.4e-04 ± 3.5e-04 | 292 ± 214 / 292 ± 214 / 0 |
+| S2, T = 50 | P-GD | 10/10 | 32 ± 6 | 80 ± 8 | 2.4e-10 ± 3.8e-10 | 83 ± 8 / 83 ± 8 / 0 |
+| S2, g_trig = 0.0001 | GD-NC | 1/1 | 2 | 37 | -1.7e-16 | 40 / 37 / 12 |
+| S2, g_trig = 0.01 | GD-NC | 1/1 | 2 | 37 | -1.7e-16 | 40 / 37 / 36 |
 
 ![Effect of T](docs/figures/q4_parameter.png)
 
-**What we see.** TODO
+**What we see.**
+- **P-GD, $g_{trig}$**: $10^{-3}$ (default) is best (88); smaller waits longer to kick
+  (111), larger kicks too often near the minimum (103 ± 43).
+- **P-GD, $r$**: a small ball escapes slowly (54); a large one escapes fast (15) but then
+  knocks the point off the minimum (success 243 ± 199, final gap $3\cdot10^{-3}$).
+- **P-GD, $T$**: kicking often ($T = 10$) disturbs the point near the minimum (268 ± 194);
+  $T = 50$ is the fastest (80 ± 8), the steadiest and the most accurate (gap $2\cdot10^{-10}$).
+- **GD-NC, $g_{trig}$**: the path does not change (37 updates in all three); only the
+  number of Hessians to success does: 12, 22, 36.
 
-**Chosen configurations.** P-GD: TODO. GD-NC: TODO. Why: TODO.
+**Chosen configurations.** P-GD: $T = 50$ (fastest success, smallest spread, best
+final gap). GD-NC: $g_{trig} = 10^{-4}$ (same path, fewest Hessians).
 (Re-run with them: `make hw PGD="T=..." GDNC="g_trig=..."`.)
 
 ### S2 figures
@@ -213,10 +294,55 @@ $N_H = 0$ in every run.
 As asked in section 4 of the assignment: LDH on S1-S5 against GD and the two
 configurations chosen in Question 4, all parameters fixed across the five cases.
 
-**Table.** TODO (from `make hw PGD=... GDNC=...`)
+The table below uses the default P-GD and GD-NC. For the version with the chosen
+configurations, run `make hw PGD="T=50" GDNC="g_trig=1e-4"` (it adds the S1-S5 rows).
 
-**Effect of the modification (S2, same seeds and parameters).** TODO: benefits, extra
-work ($N_f$), limitations.
+| Setting | Method | Success | k_esc | k_succ | Final gap | Work to success Nf / Ng / NH |
+|---|---|---|---|---|---|---|
+| S1, default | GD | 1/1 | 25 | 29 | 0.0e+00 | 32 / 29 / 0 |
+| S1, default | P-GD | 10/10 | 7 ± 1 | 14 ± 1 | 4.4e-17 ± 9.4e-17 | 18 ± 2 / 16 ± 1 / 0 |
+| S1, default | GD-NC | 1/1 | 2 | 2 | 1.6e-15 | 3 / 2 / 1 |
+| S1, default | LDH (proposed) | 10/10 | 4 ± 0 | 12 ± 0 | 0.0e+00 ± 0.0e+00 | 44 / 24 / 0 |
+| S1, default | LDH, guessed B | 10/10 | 4 ± 0 | 12 ± 0 | 0.0e+00 ± 0.0e+00 | 44 / 16 / 0 |
+| S2, default | GD | 1/1 | 166 | 218 | -1.7e-16 | 219 / 218 / 0 |
+| S2, default | P-GD | 10/10 | 31 ± 5 | 88 ± 16 | 1.3e-04 ± 2.5e-04 | 92 ± 17 / 92 ± 17 / 0 |
+| S2, default | GD-NC | 1/1 | 2 | 37 | -1.7e-16 | 40 / 37 / 22 |
+| S2, default | LDH (proposed) | 10/10 | 6 ± 0 | 13 ± 0 | -1.7e-16 ± 0.0e+00 | 45 / 25 / 0 |
+| S2, default | LDH, guessed B | 10/10 | 6 ± 0 | 13 ± 0 | -1.7e-16 ± 0.0e+00 | 45 / 17 / 0 |
+| S3, default | GD | 1/1 | 1474 | 1848 | 6.8e-16 | 1849 / 1848 / 0 |
+| S3, default | P-GD | 10/10 | 141 ± 102 | 656 ± 206 | 3.5e-03 ± 4.8e-03 | 691 ± 216 / 691 ± 216 / 0 |
+| S3, default | GD-NC | 1/1 | 2 | 180 | 9.5e-16 | 184 / 180 / 179 |
+| S3, default | LDH (proposed) | 10/10 | 5 ± 0 | 8 ± 0 | -1.4e-16 ± 0.0e+00 | 45 / 30 / 0 |
+| S3, default | LDH, guessed B | 10/10 | 5 ± 0 | 8 ± 0 | -1.4e-16 ± 0.0e+00 | 45 / 16 / 0 |
+| S4, default | GD | 0/1 | NR | NR | 1.0e+00 | NR / NR / NR |
+| S4, default | P-GD | 10/10 | 6 ± 1 | 13 ± 1 | 4.4e-17 ± 9.4e-17 | 18 ± 2 / 15 ± 1 / 0 |
+| S4, default | GD-NC | 1/1 | 1 | 1 | 0.0e+00 | 2 / 1 / 1 |
+| S4, default | LDH (proposed) | 10/10 | 3 ± 0 | 11 ± 0 | 0.0e+00 ± 0.0e+00 | 42 / 23 / 0 |
+| S4, default | LDH, guessed B | 10/10 | 3 ± 0 | 11 ± 0 | 0.0e+00 ± 0.0e+00 | 42 / 15 / 0 |
+| S5, default | GD | 1/1 | – | 3 | 8.9e-16 | 5 / 3 / 0 |
+| S5, default | P-GD | 10/10 | – | 4 ± 1 | 4.4e-17 ± 9.4e-17 | 8 ± 1 / 6 ± 1 / 0 |
+| S5, default | GD-NC | 1/1 | – | 3 | 8.9e-16 | 5 / 3 / 2 |
+| S5, default | LDH (proposed) | 10/10 | – | 4 ± 0 | 0.0e+00 ± 0.0e+00 | 21 / 11 / 0 |
+| S5, default | LDH, guessed B | 10/10 | – | 4 ± 0 | 0.0e+00 ± 0.0e+00 | 22 / 7 / 0 |
+
+**What we see.**
+- LDH succeeds in all five cases, every seed, with the same result each time (± 0): its
+  kick (the only random part) was never needed.
+- Its advantage grows as the curvature weakens: S1 12 vs GD-NC 2 and P-GD 14; S2 13 vs 37
+  and 88; S3 8 vs 180 and 656. With weak curvature the others crawl on the way to the
+  minimum; LDH's step along $y$ keeps doubling ($\rho \ge 1$) until it lands.
+- Its price is in function values: about 45 $f$ to success on S1-S4 (the $\rho$ tests),
+  more than P-GD on the easy cases (18 at S1) but far fewer than everyone on S2-S3.
+  No Hessian ever. The guessed-$B$ version takes the same path in 2D and needs fewer
+  gradients (16 vs 24-30), since it never measures $B$.
+- Near the minimum (S5) it is slightly more expensive than GD (21 vs 5 $f$): the $\rho$
+  tests cost something even when there is nothing to escape.
+
+**Effect of the modification (S2, same start, same backtracking).** Against the
+original algorithm, plain GD: 13 updates instead of 218, and 45 $f$ + 25 $\nabla f$
+instead of 219 + 218 to success. The benefit comes from the learned step size (it
+replaces GD's crawl near the saddle) and from the guided probes (they find the way down
+in one round). Limitations: below.
 
 ## Beyond the assignment: 27 cases
 
@@ -232,8 +358,69 @@ GD, P-GD, GD-NC, Jin et al., Probe + Nesterov, LDH and LDH with a guessed $B$ on
 one run per cell (189 runs). Tables: `results/cases_results.xlsx`, merged headers
 function → $\gamma$ → start.
 
-**Summary.** TODO (one small table: steps to the minimum per method, worst case of each
-function)
+Each cell: updates to success (total $f + \nabla f + H$ evaluations to success). Bold =
+fewest updates. NR = never reached in 3000 updates. One run per cell (seed 0, also the
+run in the pictures).
+
+**Plain 2D**
+
+| γ | start | GD | P-GD | GD-NC | Jin et al. | Probe + Nesterov | LDH | LDH, guessed B |
+|---|---|---|---|---|---|---|---|---|
+| 1 | near saddle | 29 (61) | 15 (37) | **2 (6)** | 15 (37) | 12 (41) | 12 (68) | 12 (60) |
+| 1 | on saddle | NR | 14 (35) | **1 (4)** | 14 (35) | 10 (36) | 11 (65) | 11 (57) |
+| 1 | near minimum | **3 (8)** | **3 (11)** | **3 (10)** | **3 (11)** | **3 (15)** | 4 (32) | 4 (29) |
+| 0.1 | near saddle | 218 (437) | 90 (190) | 37 (99) | 94 (194) | 30 (107) | **13 (70)** | **13 (62)** |
+| 0.1 | on saddle | NR | 89 (188) | 36 (97) | 93 (192) | 28 (102) | **12 (67)** | **12 (59)** |
+| 0.1 | near minimum | 4 (9) | 16 (36) | 4 (12) | 16 (36) | 3 (13) | **2 (17)** | **2 (16)** |
+| 0.01 | near saddle | 1848 (3697) | 482 (1016) | 180 (543) | NR | 12 (56) | **8 (75)** | **8 (61)** |
+| 0.01 | on saddle | NR | 481 (1014) | 179 (541) | NR | 10 (51) | **7 (72)** | **7 (58)** |
+| 0.01 | near minimum | **1 (3)** | **1 (4)** | **1 (3)** | **1 (4)** | **1 (3)** | **1 (6)** | **1 (7)** |
+
+**2D turned 45°**
+
+| γ | start | GD | P-GD | GD-NC | Jin et al. | Probe + Nesterov | LDH | LDH, guessed B |
+|---|---|---|---|---|---|---|---|---|
+| 1 | near saddle | 29 (61) | 20 (47) | **2 (6)** | 20 (47) | 14 (54) | 25 (170) | 25 (187) |
+| 1 | on saddle | NR | 19 (45) | **1 (4)** | 19 (45) | 12 (48) | 18 (104) | 16 (108) |
+| 1 | near minimum | **3 (8)** | **3 (11)** | **3 (10)** | **3 (11)** | **3 (15)** | 13 (76) | 13 (83) |
+| 0.1 | near saddle | 218 (437) | 108 (226) | 37 (99) | NR | **30 (108)** | 52 (240) | 53 (289) |
+| 0.1 | on saddle | NR | 107 (224) | 36 (97) | NR | **28 (102)** | 50 (229) | 44 (247) |
+| 0.1 | near minimum | 4 (9) | **2 (8)** | 4 (12) | **2 (8)** | 3 (13) | 29 (140) | 26 (149) |
+| 0.01 | near saddle | 1848 (3697) | 462 (974) | 180 (543) | NR | 212 (649) | 186 (840) | **77 (455)** |
+| 0.01 | on saddle | NR | 461 (972) | 179 (541) | NR | NR | 173 (785) | **95 (542)** |
+| 0.01 | near minimum | **1 (3)** | **1 (4)** | **1 (3)** | **1 (4)** | **1 (3)** | 285 (1164) | 290 (1468) |
+
+**100D, random rotation**
+
+| γ | start | GD | P-GD | GD-NC | Jin et al. | Probe + Nesterov | LDH | LDH, guessed B |
+|---|---|---|---|---|---|---|---|---|
+| 1 | near saddle | 29 (61) | 18 (43) | **2 (6)** | 18 (43) | 21 (666) | 207 (20199) | 158 (29127) |
+| 1 | on saddle | NR | 17 (41) | **1 (4)** | 17 (41) | NR | 191 (18439) | 145 (26433) |
+| 1 | near minimum | **3 (8)** | 4 (13) | **3 (10)** | 4 (13) | **3 (211)** | 112 (10463) | 69 (11192) |
+| 0.1 | near saddle | 218 (437) | 108 (226) | **37 (99)** | 109 (228) | 69 (1408) | 115 (11058) | 80 (15448) |
+| 0.1 | on saddle | NR | 107 (224) | **36 (97)** | 108 (226) | NR | NR | 86 (16333) |
+| 0.1 | near minimum | 4 (9) | 12 (28) | 4 (12) | 12 (28) | **3 (209)** | 14 (1237) | 9 (1292) |
+| 0.01 | near saddle | 1848 (3697) | 762 (1604) | **180 (543)** | NR | 212 (1237) | 798 (61953) | 513 (94498) |
+| 0.01 | on saddle | NR | 761 (1602) | **179 (541)** | NR | NR | NR | 728 (114271) |
+| 0.01 | near minimum | **1 (3)** | **1 (4)** | **1 (3)** | **1 (4)** | **1 (3)** | 5 (424) | 5 (855) |
+
+**What we see.**
+- **Plain 2D**: LDH is the fastest for $\gamma \le 0.1$, near the saddle and exactly on it
+  (7-13 updates), and cheaper in total work than P-GD and GD-NC there. For $\gamma = 1$
+  GD-NC wins (1-2 updates).
+- **Turned 45°**: GD, P-GD and GD-NC give the same numbers as on the plain function (they
+  do not depend on the axes). LDH does: its step sizes belong to $x$ and $y$, the valley
+  runs diagonally, and the path zigzags across it (see the pictures). It is slower than
+  GD-NC and Probe + Nesterov at $\gamma = 0.1$, and much slower near a minimum (up to 290
+  updates at $\gamma = 0.01$). The guessed $B$ helps at $\gamma = 0.01$ (77-95 vs 173-186).
+- **100D, random rotation**: LDH's work explodes ($N$ values of $f$ per update for $\rho$:
+  $10^4$-$10^5$ evaluations), and the measured version fails exactly on the saddle for
+  $\gamma \le 0.1$ (most likely because a tridiagonal $B$ of a dense Hessian aims the probes badly; not checked).
+  The guessed version succeeds everywhere but at a high cost. P-GD and GD-NC are unchanged.
+- **Jin et al.** stops falsely at the saddle whenever the curvature is weak ($\gamma = 0.01$,
+  and $\gamma = 0.1$ turned).
+- **Probe + Nesterov** never escapes exactly on the saddle in 100D: its axis probes miss
+  the one downhill direction.
 
 ## Every method, run by run
 
@@ -247,7 +434,8 @@ Every picture is one run, drawn by `experiments/run_cases.py` (randomized method
 
 **Parameters.** Nothing to tune (backtracking: start 1, halve, Armijo 1e-4, 40 trials).
 
-**What we see.** TODO
+**What we see.** GD needs 29 updates at $\gamma = 1$, 218 at 0.1 and 1848 at 0.01, and never moves from
+the exact saddle. Rotation changes nothing (GD does not depend on the axes).
 
 <details><summary>plain 2D function: 9 runs</summary>
 
@@ -277,7 +465,8 @@ Every picture is one run, drawn by `experiments/run_cases.py` (randomized method
 
 **Parameters.** g_trig = 1e-3, r = 1e-2, T = 20 (defaults; Question 4 varies each one on S2).
 
-**What we see.** TODO
+**What we see.** The kicks show as × along the path. P-GD escapes from the exact saddle in all cases
+(14-761 updates), and the × near the minima are the unnecessary kicks of Question 3.
 
 <details><summary>plain 2D function: 9 runs</summary>
 
@@ -307,7 +496,8 @@ Every picture is one run, drawn by `experiments/run_cases.py` (randomized method
 
 **Parameters.** g_trig = 1e-3 (default; Question 4 varies it on S2).
 
-**What we see.** TODO
+**What we see.** One negative-curvature step leaves the saddle in every case (k_esc = 1-2); the slow part
+is the GD walk to the minimum when $\gamma$ is small (180 updates at 0.01).
 
 <details><summary>plain 2D function: 9 runs</summary>
 
@@ -337,7 +527,8 @@ Every picture is one run, drawn by `experiments/run_cases.py` (randomized method
 
 **Parameters.** r = 1e-2, g_thres = 1e-3, t_thres = 20, f_thres = 1e-7.
 
-**What we see.** TODO
+**What we see.** Same paths as P-GD until the stop rule fires; at $\gamma = 0.01$ (and turned at 0.1) it
+stops at the saddle and never reaches a minimum.
 
 <details><summary>plain 2D function: 9 runs</summary>
 
@@ -367,7 +558,8 @@ Every picture is one run, drawn by `experiments/run_cases.py` (randomized method
 
 **Parameters.** Probe length δ = 1e-2, R = 3 rounds.
 
-**What we see.** TODO
+**What we see.** Fast on the plain function (10-30 updates for $\gamma \le 0.1$) and on the turned one
+at $\gamma \ge 0.1$; at $\gamma = 0.01$ turned, it fails exactly on the saddle.
 
 <details><summary>plain 2D function: 9 runs</summary>
 
@@ -397,7 +589,9 @@ Every picture is one run, drawn by `experiments/run_cases.py` (randomized method
 
 **Parameters.** m = 4, δ = 1e-2, kick r = 1e-2 (f may rise at most r²), R = 3, κ = 0.5, ω = 2, penalty p0 = 1e-4 fading by β = 0.9.
 
-**What we see.** TODO
+**What we see.** Plain function: straight up the $y$ axis in a few growing steps, 7-13 updates. Turned
+45°: the escape is still quick, but the steps zigzag across the diagonal valley on the
+way to the minimum (the per-axis step sizes do not fit a turned valley).
 
 <details><summary>plain 2D function: 9 runs</summary>
 
@@ -427,7 +621,8 @@ Every picture is one run, drawn by `experiments/run_cases.py` (randomized method
 
 **Parameters.** As LDH; B starts as the identity (curvature 1, no coupling).
 
-**What we see.** TODO
+**What we see.** Identical to LDH on the plain function. Turned, it zigzags too, but less at
+$\gamma = 0.01$ (77-95 updates vs 173-186).
 
 <details><summary>plain 2D function: 9 runs</summary>
 
@@ -453,7 +648,8 @@ Every picture is one run, drawn by `experiments/run_cases.py` (randomized method
 
 No pictures in 100D; see the 100D columns of `results/cases_results.xlsx`.
 
-**What we see.** TODO
+**What we see.** See the 100D table above: LDH's cost grows with $N$ and the measured version fails on
+the exact saddle for $\gamma \le 0.1$; P-GD and GD-NC are unaffected.
 ## Limitations
 
 - **Per-axis steps on a turned function.** The learned $d_i$ belong to the axes. When
@@ -467,7 +663,8 @@ No pictures in 100D; see the 100D columns of `results/cases_results.xlsx`.
 - **Band 1 on a dense Hessian.** On the random 100D rotation the true Hessian is dense;
   a tridiagonal $B$ is only an approximation there. The probes check it with real $f$
   values.
-- TODO (anything the results show)
+- **Results are for one function.** The benchmark has a single downhill direction; the
+  100D tests only rotate it. Many saddles at once, or noise in $f$, are untested.
 
 ## Using the code
 
