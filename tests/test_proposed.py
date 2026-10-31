@@ -6,7 +6,9 @@ Checks for the proposed method only (each part, then all together).
 import unittest
 import numpy as np
 
-from saddle.algorithms.proposed import Proposed
+from saddle.algorithms.proposed import Proposed, smallest_directions
+from saddle.algorithms.ldh import LDH
+from saddle.algorithms.ldh_guessed import LDHGuessed
 from saddle.benchmark import RotatedSaddle
 
 
@@ -84,6 +86,34 @@ class TestParts(unittest.TestCase):
         a.step()
         self.assertEqual(a.learn_step, "axes")
         self.assertIsNone(a.V)
+
+    def test_tridiagonal_solver_gives_the_smallest_directions(self):
+        rng = np.random.default_rng(1)
+        B = np.diag(rng.normal(size=8)) + np.diag(rng.normal(size=7), 1)
+        B = B + np.triu(B, 1).T
+        V, W = smallest_directions(B, 3, 1), np.linalg.eigh(B)[1][:, :3]
+        self.assertTrue(np.allclose(np.abs(V.T @ W), np.eye(3), atol=1e-8))
+
+    def test_guessed_B_matches_the_hessian_near_the_saddle(self):
+        # small moves: second-order Taylor is accurate, so the guessed entries are too
+        P = RotatedSaddle.rotated_2d(0.5, 30)
+        a = LDHGuessed(P, np.array([0.01, 0.005]))
+        a.step()
+        H = P.peek_hess(a.z)
+        self.assertAlmostEqual(a.B_off[0], H[0, 1], delta=1e-2)
+        self.assertTrue(np.allclose(a.B_diag, np.diag(H), atol=1e-2))
+
+    def test_guessed_needs_per_axis_steps(self):
+        with self.assertRaises(ValueError):
+            Proposed(RotatedSaddle.plain(1.0), (0.0, 0.0), escape="guessed", learn_step=False)
+
+    def test_ldh_and_guessed_reach_the_minimum_in_2d(self):
+        for cls in (LDH, LDHGuessed):
+            for P in (RotatedSaddle.plain(0.01), RotatedSaddle.rotated_2d(0.01, 45)):
+                for start in ("far", "close", "on", "near_min"):
+                    a = cls(P, P.start(start))
+                    a.run()
+                    self.assertTrue(at_min(a), (cls.name, P.label, start))
 
     def test_no_hessian_ever(self):
         self.assertEqual(run(RotatedSaddle.coupled(20, 0.1), "on", iters=200).counts[2], 0)

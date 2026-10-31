@@ -33,7 +33,8 @@ THE PARTS (each one can be switched on or off, so we can test what each part buy
                                  basis_every updates, because the curvature changes
                                  as we move.
                   True means "axes" (kept so the older settings still work).
-                  The default is "curvature": the window runs the full method.
+                  The default is "axes" (the LDH method); "curvature" is kept only as a
+                  switch for comparison.
   2. band b       a banded Hessian estimate B, measured from gradient differences
                   (Curtis, Powell & Reid 1974): with band b (only entries |i - j| <= b
                   are kept) it costs min(2b + 1, N) extra gradients, whatever N is.
@@ -43,8 +44,18 @@ THE PARTS (each one can be switched on or off, so we can test what each part buy
                     "curvature"  step along B's most negative direction, exactly like
                                  GD-NC but with the MEASURED B instead of the true Hessian
                     "axes"       probe +-delta along every coordinate axis (2N probes)
-                    "bag"        probe +-delta along the bag_size directions where B curves
-                                 down the most (B's eigenvectors with the smallest eigenvalues)
+                    "bag"        probe +-delta along the bag_size directions where the
+                                 MEASURED B curves down the most (B's eigenvectors with the
+                                 smallest eigenvalues). For a tridiagonal B (band 1) only those
+                                 few eigenvectors are computed, with a tridiagonal solver: about
+                                 linear in N, the upward directions are never computed.
+                    "guessed"    the same probes, but aimed by a GUESSED B that is never
+                                 measured: it is learned for free while learning the step sizes
+                                 (see _learn_step_sizes). Diagonal: H_i = 2 (1 - rho_i) / d_i.
+                                 Off-diagonal (neighbours i, i+1): one extra f per pair, the two
+                                 axis moves made together. Directions: for each neighbour pair,
+                                 the 2 x 2 block of B and its eigenvectors, solved by hand (a
+                                 formula, no solver). Needs learn_step = "axes".
   4. kick         if every probe is worse, do not just give up: take one direction from
                   the bag and step UPHILL a little, capped inside a ball of radius r
                   (the same radius as the paper's perturbation) and capped in how much f
@@ -94,14 +105,18 @@ class Proposed(Algorithm):
     name = "Proposed"
 
     def __init__(self, problem, z0, max_iters=3000, seed=0, g_trig=G_TRIG,
-                 learn_step="curvature", band=1, escape="bag", bag_size=4, kick=True, penalty=True,
+                 learn_step="axes", band=1, escape="bag", bag_size=4, kick=True, penalty=True,
                  delta=1e-2, r=R_DEFAULT, R=3, h=1e-5, p0=1e-4, beta=0.9, eps_f=1e-12,
-                 kappa=0.5, omega=2.0, d_min=1e-6, d_max=100.0, basis_every=20):
+                 kappa=0.5, omega=2.0, d_min=1e-6, d_max=100.0, basis_every=20, L=1.0):
         # which parts are on
         if learn_step is True:                   # the older setting meant per-axis steps
             learn_step = "axes"
         self.learn_step, self.escape, self.kick, self.penalty = learn_step, escape, kick, penalty
         self.basis_every = basis_every            # how often B is measured again for the steps
+        self.L = L                                # first guess of every curvature (guessed B)
+        if escape == "guessed" and learn_step != "axes":
+            raise ValueError('escape="guessed" learns B while learning per-axis steps: '
+                             'use learn_step="axes"')
         self.band = band                  # None = never measured; "full" or N-1 = full matrix
         self.bag_size = bag_size
         # sizes and thresholds
@@ -120,6 +135,10 @@ class Proposed(Algorithm):
         self.V = None                                 # the step directions: None = the axes,
                                                       # else the columns are B's eigenvectors
         self.basis_k = None                           # update number when B was last measured
+        # the guessed B (escape="guessed"): its diagonal and its one off-diagonal.
+        # Before anything is learned every direction is guessed to curve up by L, no coupling.
+        self.B_diag = np.full(n, float(self.L))
+        self.B_off = np.zeros(max(n - 1, 0))
         self.p = np.zeros(n)                          # per-axis penalties (penalty)
         self.fails = 0                                # search rounds in a row with no drop
         self.anchor = None                            # best point of the current search
@@ -244,13 +263,49 @@ class Proposed(Algorithm):
     def _directions(self):
         """The directions to probe, one per column."""
         n = len(self.z)
+        m = min(self.bag_size, n)
         if self.escape == "axes":
             return np.eye(n)                          # every coordinate axis: 2N probes
+        if self.escape == "guessed":
+            return self._guessed_directions(m)
         B = self.measure_curvature()
         if self.learn_step == "curvature":
             self._set_basis(B)                        # measured anyway: reuse it for the steps
-        lam, V = np.linalg.eigh(B)
-        return V[:, :min(self.bag_size, n)]           # where B curves down the most
+            return self.V[:, :m]
+        return smallest_directions(B, m, self._band_width())
+
+    def _guessed_directions(self, m):
+        """The m directions where the GUESSED B curves down the most, without any solver.
+        Each neighbour pair (i, i+1) has a 2 x 2 block [[a, b], [b, c]] of B. Its smallest
+        eigenvalue and direction have a formula:
+            lam = (a + c)/2 - sqrt(((a - c)/2)^2 + b^2),  direction (b, lam - a)
+        (or the axis with the smaller of a, c when b = 0). The other eigenvalue is
+        (a + c)/2 + sqrt(...) with the perpendicular direction. Rank all of them, keep the m
+        most negative, each written as a full N-vector (zero outside its pair)."""
+        n = len(self.z)
+        a, c, b = self.B_diag[:-1], self.B_diag[1:], self.B_off
+        mid, rad = (a + c) / 2, np.sqrt(((a - c) / 2)**2 + b**2)
+        found = []                                    # (eigenvalue, direction)
+        for i in range(n - 1):
+            lo = mid[i] - rad[i]
+            if abs(b[i]) > 1e-14:
+                u = np.array([b[i], lo - a[i]])
+            else:
+                u = np.array([1.0, 0.0]) if a[i] <= c[i] else np.array([0.0, 1.0])
+            u /= np.linalg.norm(u)
+            for lam, w in ((lo, u), (mid[i] + rad[i], np.array([-u[1], u[0]]))):
+                v = np.zeros(n)
+                v[i:i + 2] = w
+                found.append((lam, v))
+        found.sort(key=lambda t: t[0])
+        dirs, seen = [], []
+        for lam, v in found:                          # skip repeats (one axis can come twice)
+            if all(abs(v @ s) < 1 - 1e-9 for s in seen):
+                dirs.append(v)
+                seen.append(v)
+            if len(dirs) == m:
+                break
+        return np.array(dirs).T           # where B curves down the most
 
     def _penalty_of(self, v):
         """How much we already used direction v: sum of p_j weighted by v_j^2."""
@@ -342,7 +397,10 @@ class Proposed(Algorithm):
         alone: d_i c_i^2; compare with the actual drop; rho = actual / predicted =
         1 - d_i H_i / 2, where H_i is the curvature along v_i. Move d_i toward 1 / H_i,
         or grow it when the direction curves down (rho >= 1)."""
-        for i in range(len(self.z)):
+        n = len(self.z)
+        guess = self.escape == "guessed"
+        moves, f_moves = np.zeros(n), np.full(n, np.nan)   # each axis move and its f (guessed B)
+        for i in range(n):
             c = self.g[i] if self.V is None else self.V[:, i] @ self.g
             pred = self.d[i] * c**2
             if pred < 1e-12:                          # too small to measure: rounding noise
@@ -352,10 +410,45 @@ class Proposed(Algorithm):
                 zi[i] -= self.d[i] * c
             else:
                 zi = self.z - self.d[i] * c * self.V[:, i]
-            rho = (self.fz - self.problem.f(zi)) / pred
+            fi = self.problem.f(zi)
+            rho = (self.fz - fi) / pred
+            if guess:
+                # the same rho tells the curvature along this axis: rho = 1 - d H / 2
+                self.B_diag[i] = 2 * (1 - rho) / self.d[i]
+                moves[i], f_moves[i] = -self.d[i] * c, fi
             factor = np.clip((1.0 / (2 * (1 - rho)))**self.kappa, 0.1, 10.0) if rho < 1 \
                 else self.omega
             self.d[i] = np.clip(self.d[i] * factor, self.d_min, self.d_max)
+        if guess:
+            self._learn_coupling(moves, f_moves)
+
+    def _learn_coupling(self, w, fw):
+        """Guessed B, off-diagonal: make the moves of axes i and i+1 TOGETHER (one extra f).
+        Taylor to second order, the plain parts cancel and only the coupling is left:
+            f(z + w_i e_i + w_j e_j) - f(z + w_i e_i) - f(z + w_j e_j) + f(z) = w_i w_j H_ij
+        (exact when f is quadratic). Skipped when the moves are too small to measure."""
+        for i in range(len(self.z) - 1):
+            j = i + 1
+            if np.isnan(fw[i]) or np.isnan(fw[j]) or abs(w[i] * w[j]) < 1e-12:
+                continue
+            zij = self.z.copy()
+            zij[i] += w[i]
+            zij[j] += w[j]
+            both = self.problem.f(zij)
+            self.B_off[i] = (both - fw[i] - fw[j] + self.fz) / (w[i] * w[j])
+
+
+def smallest_directions(B, m, band):
+    """The m eigenvectors of B with the smallest eigenvalues (where B curves down the most).
+    Tridiagonal B (band <= 1): a tridiagonal solver that computes ONLY those m, about
+    linear in N; the upward directions are never computed. Wider band: a full solve."""
+    n = len(B)
+    if band <= 1 and n > 2:
+        from scipy.linalg import eigh_tridiagonal
+        _, V = eigh_tridiagonal(np.diag(B).copy(), np.diag(B, 1).copy(),
+                                select="i", select_range=(0, m - 1))
+        return V
+    return np.linalg.eigh(B)[1][:, :m]
 
 
 ALGORITHM = Proposed
