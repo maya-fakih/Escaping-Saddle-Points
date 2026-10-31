@@ -71,8 +71,8 @@ and **not merged back**; each branch has a test that checks only its method.
 | `probe-walk` | probes when stuck; if all probes look equal (flat) move to one and look further (probe length doubles); turn the axes before calling it a minimum | `python -m unittest tests.test_probe_walk` |
 | `learned-step` | only the per-axis step sizes learned from predicted vs actual drop (no probes) | `python -m unittest tests.test_learned_step` |
 | `jin-pgd` | Jin et al. (2017) perturbed GD: kick in a ball, stop if f did not drop by f_thres after t_thres steps | `python -m unittest tests.test_jin_pgd` |
-| `proposed` | the proposed method as one class with switches for each part: measured banded curvature (CPR), probe bag, capped kick, fading penalty, give-up rule, learned steps | `python -m unittest tests.test_proposed` |
-| `all-methods` | every branch merged, plus `experiments/run_grid.py` (the full test grid) | all of the above |
+| `proposed` | LDH (Learned Diagonal Hessian): per-dimension step sizes learned from ρ; when stuck, probes along the m most negative directions of a tridiagonal B (measured, or guessed from ρ), capped kick, give-up after R rounds, fading penalty. One class with a switch per part (`proposed.py`), plus `ldh.py` and `ldh_guessed.py` | `python -m unittest tests.test_proposed` |
+| `all-methods` | every branch merged, plus the experiment scripts in `experiments/` | all of the above |
 
 ## Running
 
@@ -82,7 +82,7 @@ and **not merged back**; each branch has a test that checks only its method.
     make run visual                 # 3D window, pick the method in the window
     make run headless ALG=all       # no window, prints a results table
 
-Settings (all optional): `ALG` (gd, pgd, gdnc, jin_pgd, probe, probe_nesterov, probe_walk, learned_step, proposed or all), `FUNC` (assignment or star), `GAMMA` (> 0, default 1;
+Settings (all optional): `ALG` (gd, pgd, gdnc, jin_pgd, probe_nesterov, ldh, ldh_guessed, any other method file on the branch, or all), `FUNC` (assignment or star), `GAMMA` (> 0, default 1;
 headless takes a list like `GAMMA="1 0.1 0.01"`), `X0`, `Y0` (start, default (0.05, 1e-8)), `ANGLE` (turn the 2D function by this many degrees, default 0), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
 (steps per second in the window). Example:
 
@@ -104,19 +104,19 @@ on screen are computed without counting, so they do not change the work.
 In the window the gamma, x0, y0 and angle boxes change the function and the start; press
 **Apply**. **Start at (0,0)** puts the start exactly on the saddle.
 
-## The full test grid (branch all-methods)
+## Experiments (branch all-methods)
 
-    python experiments/run_grid.py --quick              # smoke test: small, finishes in ~2 minutes
-    python experiments/run_grid.py --workers 8          # everything: 4 functions x 3 gammas x 4 starts x every row
+    python experiments/run_hw.py                    # the assignment: S1-S5 (Q1-Q3) + Question 4 on S2
+    python experiments/run_hw.py --pgd T=50 --gdnc g_trig=1e-4   # + S1-S5 rows for your Q4 choices
+    python experiments/hw_figures.py                # S2 contours, S2 gap vs k, one Q4 plot
+    python experiments/run_cases.py                 # the 27 cases below, 7 methods
 
-Functions: `2d` (the assignment function), `2d_rot` (turned 45 deg), `100d_band` (100D,
-neighbours coupled), `100d_rand` (100D, random rotation). Gammas 1, 0.1, 0.01. Starts far,
-close, on (the saddle), near_min. Rows: the assignment baselines with every Q4 value,
-Jin et al. PGD, each part of the proposed method alone, the parts together, and the earlier
-variants. Pick a subset with `--functions`, `--gammas`, `--starts`, `--rows`; see `--help`.
-Every finished run is appended to `results/grid_runs.csv`, so a stopped run picks up where it
-left off. At the end `results/grid_results.xlsx` holds the tables (merged headers: function,
-then gamma, then start).
+`run_cases.py`: 2D, 2D turned 45°, 100D with a random rotation × γ = 1, 0.1, 0.01 ×
+starts near the saddle, on it, near a minimum. Methods: GD, P-GD, GD-NC, Jin et al. PGD,
+Probe + Nesterov, LDH (the proposed method), LDH with a guessed B. Every finished run is
+appended to `results/cases_runs.csv` (a stopped run resumes); tables in
+`results/cases_results.xlsx` with merged headers (function, then γ, then start).
+Everything goes into `results/`.
 
 Headless columns: `k_esc` = first k that is 10% of the way down from the saddle,
 `k_succ` = first k at a real minimum (gap <= 1e-4, |grad| <= 1e-5, no negative curvature),
