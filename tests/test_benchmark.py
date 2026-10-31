@@ -8,6 +8,7 @@ import numpy as np
 
 from saddle.benchmark import Benchmark, Star
 from saddle.algorithms.base import Algorithm
+from saddle.metrics import probe_rounds
 
 
 class TestBenchmark(unittest.TestCase):
@@ -87,6 +88,17 @@ class TestBase(unittest.TestCase):
         g = a.problem.grad(a.z)
         z_new, f_new = a.backtrack(a.z, a.fz, -g, g @ g)
         self.assertLess(f_new, a.fz)
+
+
+class TestProbeRounds(unittest.TestCase):
+    def test_round_numbers(self):
+        log = [(0, "failed"), (0, "failed"), (1, "escaped"), (9, "failed"), (9, "gave up")]
+        r = probe_rounds(log, k_succ=5)
+        self.assertEqual(r, dict(rounds=5, escape_round=3, stuck_round=5, rounds_to_min=3))
+
+    def test_no_probes(self):
+        self.assertEqual(probe_rounds([], None),
+                         dict(rounds=0, escape_round=None, stuck_round=None, rounds_to_min=None))
 
 
 if __name__ == "__main__":
