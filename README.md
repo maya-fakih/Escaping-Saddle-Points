@@ -326,6 +326,10 @@ In the window the gamma, x0, y0 and angle boxes change the function and the star
 
 ## Experiments (branch all-methods)
 
+    make experiments                                # all of it: make hw + make figures + make cases
+    make hw PGD="T=50" GDNC="g_trig=1e-4"           # after Question 4: with your chosen configs
+
+
     python experiments/run_hw.py                    # the assignment: S1-S5 (Q1-Q3) + Question 4 on S2
     python experiments/run_hw.py --pgd T=50 --gdnc g_trig=1e-4   # + S1-S5 rows for your Q4 choices
     python experiments/hw_figures.py                # S2 contours, S2 gap vs k, one Q4 plot
