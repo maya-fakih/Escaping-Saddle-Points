@@ -29,7 +29,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, RadioButtons, Slider, TextBox
 
-from saddle.metrics import at_minimum
+from saddle.metrics import at_minimum, probe_rounds
 
 PANEL_LEFT, PANEL_WIDTH = 0.76, 0.22     # the dashboard column
 
@@ -226,8 +226,15 @@ class Simulator:
             lines += ["Hessian= n/a (method does not use it)"]
         nf, ng, nh = a.counts
         lines += [f"work   = Nf {nf}  Ng {ng}  NH {nh}"]
+        if a.probe_log:
+            r = probe_rounds(a.probe_log, self.reached)
+            show = lambda v: "-" if v is None else v
+            lines += [f"probes = {r['rounds']} rounds, last: {a.probe_log[-1][1]}",
+                      f"         escaped @ round {show(r['escape_round'])}, "
+                      f"gave up @ {show(r['stuck_round'])}"]
         if self.reached is not None:
-            lines += [f"reached a minimum at k={self.reached}"]
+            extra = "" if not a.probe_log else f" (after {probe_rounds(a.probe_log, self.reached)['rounds_to_min']} rounds)"
+            lines += [f"reached a minimum at k={self.reached}{extra}"]
         if a.failed_at is not None:
             lines += [f"line search failed at k={a.failed_at}"]
         if self.message:
