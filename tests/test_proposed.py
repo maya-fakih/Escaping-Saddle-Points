@@ -71,6 +71,20 @@ class TestParts(unittest.TestCase):
         a.step()
         self.assertTrue(np.all(a.p <= 0.5 + 1e-12))
 
+    def test_curvature_steps_follow_the_turned_valley(self):
+        # learn_step="curvature": the step directions are B's eigenvectors, which on
+        # the 45 deg function are the turned axes (1, 1)/sqrt 2 and (1, -1)/sqrt 2
+        a = Proposed(RotatedSaddle.rotated_2d(0.1, 45), (0.05, 1e-8), learn_step="curvature")
+        a.step()
+        cos = np.abs(a.V.T @ (np.array([[1, 1], [1, -1]]) / np.sqrt(2)))
+        self.assertTrue(np.allclose(np.sort(cos.max(axis=1)), 1.0, atol=1e-3))
+
+    def test_learn_step_true_means_axes(self):
+        a = Proposed(RotatedSaddle.plain(1.0), (0.05, 1e-8), learn_step=True)
+        a.step()
+        self.assertEqual(a.learn_step, "axes")
+        self.assertIsNone(a.V)
+
     def test_no_hessian_ever(self):
         self.assertEqual(run(RotatedSaddle.coupled(20, 0.1), "on", iters=200).counts[2], 0)
 
