@@ -47,7 +47,7 @@ COST
 """
 import numpy as np
 
-from saddle.algorithms.base import Algorithm
+from saddle.algorithms.base import Algorithm, turned_axes
 from saddle.cases import G_TRIG
 
 
@@ -68,8 +68,9 @@ class Probe(Algorithm):
 
     def setup(self):
         self.g = self.problem.grad(self.z)
-        self.d = np.ones(2)                       # step size per axis
-        self.curv = np.full(2, np.nan)            # curvature estimate per axis (unknown yet)
+        n = len(self.z)                           # works in any dimension
+        self.d = np.ones(n)                       # step size per axis
+        self.curv = np.full(n, np.nan)            # curvature estimate per axis (unknown yet)
         if self.hessian_start:
             h = np.diag(self.problem.hess(self.z)).copy()
             self.curv = h.copy()
@@ -99,10 +100,9 @@ class Probe(Algorithm):
     def _probe(self):
         """3. Look a little to each side along two axes; jump to the lowest if it helps."""
         ang = self.fails * np.pi / (2 * self.R)   # rotate the probe axes after failures
-        c, s = np.cos(ang), np.sin(ang)
-        U = np.array([[c, -s], [s, c]])           # columns = probe axes
+        U = turned_axes(len(self.z), ang)         # columns = probe axes (in 2D: x, y turned)
         best_f, best_z = self.fz, None
-        for i in range(2):
+        for i in range(len(self.z)):
             u = U[:, i]
             if np.all(np.isfinite(self.curv)):
                 h_u = abs(u**2 @ self.curv)       # curvature along u from the axis estimates
@@ -132,7 +132,7 @@ class Probe(Algorithm):
 
     def _learn_step_sizes(self):
         """2. Compare predicted and actual drop along each axis and adjust d_i."""
-        for i in range(2):
+        for i in range(len(self.z)):
             p = self.d[i] * self.g[i]**2
             if p < 1e-12:
                 continue
