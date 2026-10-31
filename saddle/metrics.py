@@ -35,7 +35,7 @@ def at_minimum(P, z):
 def probe_rounds(log, k_succ=None):
     """Summarize a probe log [(k, outcome), ...]. Round numbers start at 1; None = never."""
     first = lambda outcome: next((i + 1 for i, (_, o) in enumerate(log) if o == outcome), None)
-    to_min = None if k_succ is None else sum(1 for k, _ in log if k < k_succ)
+    to_min = None if k_succ is None or not log else sum(1 for k, _ in log if k < k_succ)
     return dict(rounds=len(log), escape_round=first("escaped"), stuck_round=first("gave up"),
                 rounds_to_min=to_min)
 
