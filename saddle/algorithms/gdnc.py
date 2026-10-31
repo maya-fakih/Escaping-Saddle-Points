@@ -65,6 +65,7 @@ class GDNC(Algorithm):
             if f_try <= self.fz + ARMIJO * t**2 * lam:
                 self.z, self.fz = z_try, f_try
                 self.nc_steps.append(self.k)
+                self.log_round("escaped")             # count it as one escape step
                 return True
             t *= 0.5
         return False
