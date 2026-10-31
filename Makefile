@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-#   make install                 create the venv in ../venv and install numpy + matplotlib
+#   make install                 create the venv in ../venv and install numpy, matplotlib, openpyxl
 #   make run visual  ALG=gd      open the 3D simulator (you can switch method in the window)
 #   make run headless ALG=all    no window, print a results table at the end
 #   make test                    run the tests on this branch
