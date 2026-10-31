@@ -116,19 +116,23 @@ class ProbeWalk(Algorithm):
             fp, zp = min(lower, key=lambda pair: pair[0])
             self.searching = False
             self.jumps.append(self.k)
+            self.log_round("escaped")
             self._move(zp, fp)
         elif equal and self.walks < self.max_walks:
             # flat: we cannot tell at this distance. Go to any equal point, look further.
             fp, zp = equal[self.rng.integers(len(equal))]
             self.walks += 1
             self.walk_steps.append(self.k)
+            self.log_round("walked")
             self.delta = min(2 * self.delta, self.delta_max)
             self._move(zp, fp)
         elif not equal and self.turns + 1 < self.R:
             self.turns += 1                       # all higher: turn the axes, look again (stay here)
+            self.log_round("failed")
         else:                                     # all higher after R turns: a minimum
             self.searching, self.stopped = False, True
             self.giveups.append(self.k)
+            self.log_round("gave up")
             self._move(self.anchor, self.f_anchor)
         return True
 
