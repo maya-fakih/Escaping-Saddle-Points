@@ -94,8 +94,12 @@ class ProbeNesterov(Algorithm):
             if self.fails >= self.R:
                 self.stopped = True
                 self.giveups.append(self.k)
+                self.log_round("gave up")
+            else:
+                self.log_round("failed")
             return False
         self.jumps.append(self.k)
+        self.log_round("escaped")
         self.fails = 0
         self.z_prev = best_z.copy()                   # restart momentum at the new point
         self.j = 0
