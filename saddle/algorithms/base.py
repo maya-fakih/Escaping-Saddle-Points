@@ -35,6 +35,7 @@ class Algorithm:
         self.path = [self.z.copy()]   # every point visited, z_0 ... z_k
         self.done = False
         self.failed_at = None         # iteration where the line search failed, if ever
+        self.probe_log = []           # probe rounds: (k, outcome); stays empty if no probes
         self.setup()
 
     def setup(self):
@@ -65,6 +66,12 @@ class Algorithm:
         while not self.done:
             self.step()
         return np.array(self.path)
+
+    def log_round(self, outcome):
+        """Record one probe round at the current iteration k. outcome is one of
+        "escaped" (found a lower point and jumped), "failed" (nothing lower, try again),
+        "walked" (all probes equal: moved and will look again), "gave up" (called it a minimum)."""
+        self.probe_log.append((self.k, outcome))
 
     @property
     def counts(self):

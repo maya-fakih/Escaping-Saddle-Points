@@ -12,6 +12,12 @@ Delta = f_s - f*  (how far down the minimum is below the saddle).
                    ("we are at a real minimum, not just somewhere flat")
 
 These checks use the uncounted peek_* functions, so they do not add to Nf/Ng/NH.
+
+For methods that probe (see Algorithm.log_round), rounds are numbered 1, 2, 3, ...:
+  rounds         = how many probe rounds in the whole run
+  escape round   = round number of the first jump to a lower point
+  stuck round    = round number of the first "gave up" (called it a minimum)
+  rounds to min  = how many rounds were done before the point first reached a minimum
 """
 import numpy as np
 
@@ -24,6 +30,14 @@ def at_minimum(P, z):
     if q > 1e-4 or np.linalg.norm(P.peek_grad(z)) > 1e-5:
         return False
     return np.linalg.eigvalsh(P.peek_hess(z))[0] >= -1e-4
+
+
+def probe_rounds(log, k_succ=None):
+    """Summarize a probe log [(k, outcome), ...]. Round numbers start at 1; None = never."""
+    first = lambda outcome: next((i + 1 for i, (_, o) in enumerate(log) if o == outcome), None)
+    to_min = None if k_succ is None else sum(1 for k, _ in log if k < k_succ)
+    return dict(rounds=len(log), escape_round=first("escaped"), stuck_round=first("gave up"),
+                rounds_to_min=to_min)
 
 
 def evaluate(algo):
@@ -41,4 +55,5 @@ def evaluate(algo):
 
     nf, ng, nh = algo.counts
     return dict(updates=algo.k, k_esc=k_esc, k_succ=k_succ, z=Z[-1], f=f[-1], q=q[-1],
-                nf=nf, ng=ng, nh=nh, failed_at=algo.failed_at)
+                nf=nf, ng=ng, nh=nh, failed_at=algo.failed_at,
+                **probe_rounds(algo.probe_log, k_succ))
