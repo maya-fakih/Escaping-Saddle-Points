@@ -69,7 +69,7 @@ STARTS = {"far": "Far", "close": "Close", "on": "On saddle", "near_min": "Near m
 # The rows: (family, method, parameters shown, file in saddle/algorithms, settings, random?)
 # "Proposed method" rows all use the same class with some parts switched off.
 # ----------------------------------------------------------------------------
-OFF = dict(kick=False, penalty=False)
+OFF = dict(kick=False, penalty=False, learn_step=False)   # every other part off
 METHODS = [
     ("Assignment baselines", "GD", "backtracking", "gd", {}, False),
     ("Assignment baselines", "P-GD", "default: g_trig=1e-3, r=1e-2, T=20", "pgd", {}, True),
@@ -85,7 +85,10 @@ METHODS = [
     ("Literature", "Perturbed GD, Jin et al. 2017 (Algorithm 2)",
      "r=1e-2, g_thres=1e-3, t_thres=20, f_thres=1e-7", "jin_pgd", {}, True),
     ("Proposed method: each part alone", "Learned per-axis step size (ρ = actual / predicted drop)",
-     "κ=0.5, ω=2", "proposed", dict(learn_step=True, escape="none", **OFF), False),
+     "κ=0.5, ω=2", "proposed", dict(escape="none", **dict(OFF, learn_step="axes")), False),
+    ("Proposed method: each part alone", "Learned step size along B's eigen-directions (start 1/|λ|, then ρ)",
+     "b = 1, B re-measured every 20 updates", "proposed",
+     dict(escape="none", **dict(OFF, learn_step="curvature")), False),
     ("Proposed method: each part alone", "Banded Hessian estimate, escape along its most negative direction",
      "band b = 0 (diagonal)", "proposed", dict(band=0, escape="curvature", **OFF), False),
     ("Proposed method: each part alone", "Banded Hessian estimate, escape along its most negative direction",
@@ -97,12 +100,17 @@ METHODS = [
     ("Proposed method: parts combined", "Banded Hessian + probe bag",
      "b = 1, bag size m = 4", "proposed", dict(band=1, escape="bag", **OFF), False),
     ("Proposed method: parts combined", "Banded Hessian + probe bag + capped uphill kick in a ball",
-     "kick radius r = 1e-2", "proposed", dict(band=1, escape="bag", kick=True, penalty=False), True),
+     "kick radius r = 1e-2", "proposed", dict(band=1, escape="bag", kick=True, penalty=False,
+                                              learn_step=False), True),
     ("Proposed method: parts combined", "Full proposed method: + fading direction penalty",
-     "p0 = 1e-4, β = 0.9", "proposed", dict(band=1, escape="bag", kick=True, penalty=True), True),
-    ("Proposed method: parts combined", "Full proposed method + learned step size",
-     "all parts on", "proposed", dict(band=1, escape="bag", kick=True, penalty=True,
-                                      learn_step=True), True),
+     "p0 = 1e-4, β = 0.9", "proposed", dict(band=1, escape="bag", kick=True, penalty=True,
+                                             learn_step=False), True),
+    ("Proposed method: parts combined", "Full proposed method + learned step per axis",
+     "all parts on, steps per x, y, ...", "proposed",
+     dict(band=1, escape="bag", kick=True, penalty=True, learn_step="axes"), True),
+    ("Proposed method: parts combined", "Full proposed method + learned step along B's directions",
+     "all parts on (the default)", "proposed",
+     dict(band=1, escape="bag", kick=True, penalty=True, learn_step="curvature"), True),
     ("Earlier variants", "Probe method (learned step + rotating axis probes)", "Oct 18 version",
      "probe", {}, False),
     ("Earlier variants", "Probe + Nesterov", "probe when stuck, Nesterov otherwise",
