@@ -69,7 +69,8 @@ def builder(args, gamma):
 def headless(build, names, z0):
     print(f"{build(names[0]).problem.label}, start = {z0}\n")
     head = f"{'method':<18}{'updates':>8}{'k_esc':>8}{'k_succ':>8}{'final f':>14}" \
-           f"{'gap q':>11}{'Nf':>7}{'Ng':>7}{'NH':>6}{'time (s)':>10}   final z"
+           f"{'gap q':>11}{'Nf':>7}{'Ng':>7}{'NH':>6}{'time (s)':>10}" \
+           f"{'rounds':>8}{'esc@':>6}{'stuck@':>8}{'min@':>6}   final z"
     print(head)
     print("-" * (len(head) + 20))
     for name in names:
@@ -81,10 +82,14 @@ def headless(build, names, z0):
         show = lambda v: "-" if v is None else str(v)
         print(f"{algo.name:<18}{m['updates']:>8}{show(m['k_esc']):>8}{show(m['k_succ']):>8}"
               f"{m['f']:>14.6e}{m['q']:>11.1e}{m['nf']:>7}{m['ng']:>7}{m['nh']:>6}{sec:>10.4f}"
+              f"{m['rounds']:>8}{show(m['escape_round']):>6}{show(m['stuck_round']):>8}"
+              f"{show(m['rounds_to_min']):>6}"
               f"   ({m['z'][0]:.3e}, {m['z'][1]:.3e})"
               + (f"   line search failed at k={m['failed_at']}" if m['failed_at'] is not None else ""))
     print("\nk_esc: first k that is 10% of the way down from the saddle;"
           " k_succ: first k at a real minimum (see saddle/metrics.py)")
+    print("rounds: probe rounds in the run; esc@ / stuck@: round number of the first escape /"
+          " first give-up; min@: rounds done before reaching the minimum (- = never / no probes)")
 
 
 def visual(args, build, names):
