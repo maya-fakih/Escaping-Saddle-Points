@@ -8,7 +8,8 @@ Window layout (figure coordinates go from 0 to 1, left to right and bottom to to
                                    right-drag (or scroll) to zoom.
   right 1/4 (x from 0.76 to 0.99)  the dashboard, top to bottom:
         - Algorithm picker   (radio buttons, one per method on this branch)
-        - gamma, x0, y0 boxes + Apply (restart with these values; gamma must be > 0)
+        - gamma, x0, y0, angle boxes + Apply (restart with these values; gamma must
+          be > 0; angle turns the function, in degrees)
           and "Start at (0,0)" (restart exactly on the saddle)
         - Play/Pause, Step   (Play runs at the slider speed, Step does one update)
         - Reset              (back to the start point)
@@ -21,7 +22,7 @@ success test in saddle/metrics.py). The method itself does not stop there (the
 assignment runs all K updates); press Play or Step to keep going.
 
 Usage from code:
-    # build(name, gamma, z0) -> a fresh Algorithm
+    # build(name, gamma, z0, angle) -> a fresh Algorithm
     sim = Simulator(build, ["gd", "pgd"], "gd", gamma=1.0, z0=(0.05, 1e-8))
     sim.show()
 """
@@ -35,12 +36,12 @@ PANEL_LEFT, PANEL_WIDTH = 0.76, 0.22     # the dashboard column
 
 
 class Simulator:
-    def __init__(self, build, names, first, gamma, z0, speed=5):
-        """build(name, gamma, z0) must return a new Algorithm;
-        names = the choices in the picker; gamma, z0 = the values to start with."""
+    def __init__(self, build, names, first, gamma, z0, speed=5, angle=0.0):
+        """build(name, gamma, z0, angle) must return a new Algorithm;
+        names = the choices in the picker; gamma, z0, angle = the values to start with."""
         self.build = build
-        self.name, self.gamma, self.z0 = first, gamma, tuple(z0)
-        self.algo = build(first, gamma, self.z0)
+        self.name, self.gamma, self.z0, self.angle = first, gamma, tuple(z0), angle
+        self.algo = build(first, gamma, self.z0, angle)
         self.playing = False
         self.reached = None            # k where the point first reached a minimum
         self.message = ""              # e.g. "gamma must be > 0"
@@ -55,19 +56,20 @@ class Simulator:
         # ---- right 1/4: the dashboard, top to bottom; each row starts below the last ----
         L, W = PANEL_LEFT, PANEL_WIDTH
         y = 0.96
-        h_radio = 0.034 * len(names) + 0.02            # grows with the number of methods
+        h_radio = 0.03 * len(names) + 0.02             # grows with the number of methods
         self.fig.text(L, y, "Algorithm", fontsize=10, weight="bold", va="bottom")
         y -= h_radio + 0.008                            # small gap under the title
         self.radio = RadioButtons(self.fig.add_axes([L, y, W, h_radio]),
                                   names, active=names.index(first))
 
-        # gamma / x0 / y0: three boxes in one row, names written above them
+        # gamma / x0 / y0 / angle: four boxes in one row, names written above them
         y -= 0.065
         self.boxes = {}
-        for i, (key, value) in enumerate([("gamma", gamma), ("x0", z0[0]), ("y0", z0[1])]):
-            x = L + i * 0.075
+        for i, (key, value) in enumerate([("gamma", gamma), ("x0", z0[0]), ("y0", z0[1]),
+                                          ("angle", angle)]):
+            x = L + i * 0.056
             self.fig.text(x, y + 0.037, key, fontsize=9)
-            self.boxes[key] = TextBox(self.fig.add_axes([x, y, 0.07, 0.033]), "",
+            self.boxes[key] = TextBox(self.fig.add_axes([x, y, 0.052, 0.033]), "",
                                       initial=f"{value:g}")
         y -= 0.05
         self.btn_apply = Button(self.fig.add_axes([L, y, 0.105, 0.04]), "Apply")
@@ -140,14 +142,15 @@ class Simulator:
         try:
             gamma = float(self.boxes["gamma"].text)
             z0 = (float(self.boxes["x0"].text), float(self.boxes["y0"].text))
+            angle = float(self.boxes["angle"].text)
         except ValueError:
-            self.message = "gamma, x0, y0 must be numbers"
+            self.message = "gamma, x0, y0, angle must be numbers"
             return self.redraw()
         if gamma <= 0:
             self.message = "gamma must be > 0"
             return self.redraw()
-        surface_changed = gamma != self.gamma or z0 != self.z0
-        self.gamma, self.z0 = gamma, z0
+        surface_changed = gamma != self.gamma or z0 != self.z0 or angle != self.angle
+        self.gamma, self.z0, self.angle = gamma, z0, angle
         self.restart(surface_changed)
 
     def start_at_origin(self, _event=None):
@@ -160,7 +163,7 @@ class Simulator:
         """A fresh run of the chosen method with the current gamma and start."""
         if self.playing:
             self.toggle_play()
-        self.algo = self.build(self.name, self.gamma, self.z0)
+        self.algo = self.build(self.name, self.gamma, self.z0, self.angle)
         self.reached, self.message = None, ""
         if redraw_surface:
             self._draw_surface()

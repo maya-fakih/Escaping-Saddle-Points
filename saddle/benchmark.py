@@ -138,4 +138,125 @@ class Star(Benchmark):
         return "star saddle"
 
 
+class RotatedSaddle(Benchmark):
+    """
+    The benchmark's saddle in any dimension N, seen through a rotation Q.
+
+        u = Q z                                   (turn the coordinates)
+        f(z) = 1/2 * (u_1^2 + ... + u_{N-1}^2)    (N-1 directions that curve up)
+               - gamma/2 * u_N^2 + 1/4 * u_N^4    (one direction that curves down, then up)
+
+    WHY WE HAVE IT
+      It is the assignment's function made bigger and turned. With N = 2 and Q = I
+      it IS f_gamma(x, y) (x = u_1 curves up, y = u_2 is the saddle direction).
+      Turning it does not change the landscape at all (same saddle, same minima,
+      same curvatures); it only changes how the landscape lines up with the axes.
+      That is exactly what we want to test: methods that look along the axes
+      (probes, per-axis step sizes, a banded Hessian) should care, and methods
+      that do not (GD, P-GD, GD-NC) should not.
+
+    THE FOUR VERSIONS WE TEST (built with the class methods below)
+      plain(gamma)              2D, no turn: the assignment's function
+      rotated_2d(gamma, angle)  2D, turned by `angle` (45 degrees in the tests)
+      coupled(N, gamma)         N dims, each pair (1,2), (3,4), ... turned by 45 degrees:
+                                every coordinate only talks to its neighbour, so the
+                                Hessian is banded (band 1). A banded estimate should win.
+      random(N, gamma, seed)    N dims, a random rotation: every coordinate talks to
+                                every other one, the Hessian is full. A band should lose.
+
+    Known answers: saddle at z = 0 with f = 0; minima at u = (0, ..., 0, +-sqrt(gamma)),
+    f* = -gamma^2/4, the same as the assignment.
+    """
+
+    def __init__(self, gamma, Q, label="rotated saddle"):
+        super().__init__(gamma)
+        self.Q = np.array(Q, dtype=float)
+        self.n = self.Q.shape[0]
+        self._label = label
+
+    # ---- the four versions ----
+    @classmethod
+    def plain(cls, gamma):
+        return cls(gamma, np.eye(2), f"gamma = {gamma}")
+
+    @classmethod
+    def rotated_2d(cls, gamma, angle_deg):
+        a = np.radians(angle_deg)
+        Q = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
+        return cls(gamma, Q, f"gamma = {gamma}, turned {angle_deg:g} deg")
+
+    @classmethod
+    def coupled(cls, n, gamma):
+        # one 45-degree turn inside each pair of neighbours: a block-diagonal Q
+        c = np.sqrt(0.5)
+        Q = np.zeros((n, n))
+        for i in range(0, n - 1, 2):
+            Q[i:i + 2, i:i + 2] = [[c, -c], [c, c]]
+        if n % 2:
+            Q[-1, -1] = 1.0
+        return cls(gamma, Q, f"{n}D neighbours coupled, gamma = {gamma}")
+
+    @classmethod
+    def random(cls, n, gamma, seed=0):
+        # QR of a random Gaussian matrix gives a random rotation
+        A = np.random.default_rng(seed).standard_normal((n, n))
+        Q, R = np.linalg.qr(A)
+        Q = Q * np.sign(np.diag(R))            # make the choice unique
+        return cls(gamma, Q, f"{n}D random rotation, gamma = {gamma}")
+
+    # ---- the math (not counted) ----
+    def _u(self, z):
+        # works for one point (shape N) and for a grid of points (shape N x ...)
+        return np.tensordot(self.Q, np.asarray(z, dtype=float), axes=1)
+
+    def peek_f(self, z):
+        u = self._u(z)
+        up, down = u[:-1], u[-1]
+        return 0.5 * np.sum(up**2, axis=0) - 0.5 * self.gamma * down**2 + 0.25 * down**4
+
+    def peek_grad(self, z):
+        u = self._u(z)
+        du = u.copy()                                 # d f / d u_i = u_i for the up directions
+        du[-1] = -self.gamma * u[-1] + u[-1]**3       # and this for the saddle direction
+        return self.Q.T @ du                          # back to z coordinates (chain rule)
+
+    def peek_hess(self, z):
+        u = self._u(z)
+        d = np.ones(self.n)
+        d[-1] = -self.gamma + 3 * u[-1]**2
+        return self.Q.T @ (d[:, None] * self.Q)       # Q^T diag(d) Q
+
+    # ---- known answers ----
+    @property
+    def minima(self):
+        r = np.sqrt(self.gamma)
+        e = np.zeros(self.n); e[-1] = r
+        return [self.Q.T @ e, -(self.Q.T @ e)]
+
+    @property
+    def saddle(self):
+        return np.zeros(self.n)
+
+    @property
+    def label(self):
+        return self._label
+
+    def start(self, kind):
+        """The four test starts, written in u (the function's own coordinates) and
+        turned into z, so 'far' means the same thing in every version.
+            far           1 away along the up directions, 0.5 along the saddle direction
+            close         0.05 along the up directions, 1e-8 along the saddle direction
+                          (the assignment's (0.05, 1e-8): the gradient is tiny)
+            on            exactly the saddle, 0
+            near_min      0.05 along the up directions, sqrt(gamma) + 1e-4 along the
+                          saddle direction (the assignment's S5 when gamma = 1)
+        """
+        size, along = {"far": (1.0, 0.5), "close": (0.05, 1e-8), "on": (0.0, 0.0),
+                       "near_min": (0.05, np.sqrt(self.gamma) + 1e-4)}[kind]
+        u = np.zeros(self.n)
+        u[:-1] = size / np.sqrt(self.n - 1)            # spread "size" over the up directions
+        u[-1] = along
+        return self.Q.T @ u
+
+
 FUNCTIONS = {"assignment": Benchmark, "star": Star}
