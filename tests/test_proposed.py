@@ -56,9 +56,13 @@ class TestParts(unittest.TestCase):
             for start in ("far", "close", "on", "near_min"):
                 self.assertTrue(at_min(run(P, start)), (P.label, start))
 
-    def test_never_leaves_a_minimum(self):
+    def test_kicks_at_a_minimum_are_undone(self):
+        # at a minimum nothing drops: it may kick R-1 times, then gives up once,
+        # goes back to the best point (the minimum) and never searches again
         a = run(RotatedSaddle.plain(1.0), "near_min")
-        self.assertEqual([o for _, o in a.probe_log if o in ("escaped", "kicked")], [])
+        outcomes = [o for _, o in a.probe_log]
+        self.assertNotIn("escaped", outcomes)
+        self.assertEqual(outcomes.count("gave up"), 1)
         self.assertTrue(at_min(a))
 
     def test_penalty_fades(self):
