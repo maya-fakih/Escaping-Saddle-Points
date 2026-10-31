@@ -115,6 +115,25 @@ class TestParts(unittest.TestCase):
                     a.run()
                     self.assertTrue(at_min(a), (cls.name, P.label, start))
 
+    def test_dimension_budget_rescues_100d_exact_saddle(self):
+        from saddle.metrics import evaluate
+
+        for gamma in (0.1, 0.01):
+            with self.subTest(gamma=gamma):
+                problem = RotatedSaddle.random(100, gamma, seed=0)
+                original = LDH(problem, problem.start("on"), seed=0, R=3)
+                original.run()
+                self.assertIsNone(evaluate(original)["k_succ"])
+
+                problem = RotatedSaddle.random(100, gamma, seed=0)
+                adaptive = LDH(problem, problem.start("on"), seed=0)
+                self.assertEqual(adaptive.R, 10)
+                adaptive.run()
+                self.assertIsNotNone(evaluate(adaptive)["k_succ"])
+
+        problem = RotatedSaddle.plain(0.1)
+        self.assertEqual(LDH(problem, problem.start("on")).R, 3)
+
     def test_no_hessian_ever(self):
         self.assertEqual(run(RotatedSaddle.coupled(20, 0.1), "on", iters=200).counts[2], 0)
 

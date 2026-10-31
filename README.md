@@ -735,3 +735,10 @@ Each branch's tests: `make test`.
   matrices*, IMA J. Appl. Math. 13, 1974.
 - J. Nocedal, S. J. Wright, *Numerical Optimization*, 2nd ed., Springer 2006 (ch. 4,
   trust regions).
+
+## Dimension-dependent LDH-GD search budget
+
+LDH-GD now defaults to `R(n) = max(3, ceil(sqrt(n)))`: 3 failed search
+rounds in 2D, 10 in 100D. Explicit constructor overrides such as `R=3`
+remain supported. See [the budget rule and reproduction notes](docs/search_budget.md).
+Archived experiment tables predate this default change.
