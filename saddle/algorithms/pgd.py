@@ -55,6 +55,7 @@ class PGD(Algorithm):
             fw, gw = self.problem.f(w), self.problem.grad(w)
             self.last_kick = self.k
             self.kicks.append(self.k)
+            self.log_round("kicked")                   # count it as one escape try
         z_new, f_new = self.backtrack(w, fw, -gw, gw @ gw)
         if z_new is None:
             return False
