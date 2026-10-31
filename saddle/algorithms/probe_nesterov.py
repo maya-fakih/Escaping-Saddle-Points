@@ -32,7 +32,7 @@ COST
 """
 import numpy as np
 
-from saddle.algorithms.base import Algorithm
+from saddle.algorithms.base import Algorithm, turned_axes
 from saddle.cases import G_TRIG, R as R_DEFAULT
 
 
@@ -80,10 +80,9 @@ class ProbeNesterov(Algorithm):
     def _probe(self):
         """Look a distance r to each side along two axes. Returns True if we jumped."""
         ang = self.fails * np.pi / (2 * self.R)       # rotate the axes after failures
-        c, s = np.cos(ang), np.sin(ang)
-        U = np.array([[c, -s], [s, c]])               # columns = probe axes
+        U = turned_axes(len(self.z), ang)             # columns = probe axes (in 2D: x, y turned)
         best_f, best_z = self.fz, None
-        for i in range(2):
+        for i in range(len(self.z)):
             for sign in (+1, -1):
                 zp = self.z + sign * self.r * U[:, i]
                 fp = self.problem.f(zp)
