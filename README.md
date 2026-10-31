@@ -66,22 +66,24 @@ and **not merged back**; each branch has a test that checks only its method.
 | `gd` | plain GD with backtracking | `python -m unittest tests.test_gd` |
 | `pgd` | P-GD (random kick in a disk of radius r when the gradient is small) | `python -m unittest tests.test_pgd` |
 | `gdnc` | GD-NC (step along the most negative Hessian direction) | `python -m unittest tests.test_gdnc` |
-| `probe` | my method: learned per-axis step sizes + axis probes | `python -m unittest tests.test_probe` |
+| `probe` | earlier variant: learned per-axis step sizes + axis probes | `python -m unittest tests.test_probe` |
 | `probe-nesterov` | probes only when the gradient is tiny, then Nesterov momentum | `python -m unittest tests.test_probe_nesterov` |
 | `probe-walk` | probes when stuck; if all probes look equal (flat) move to one and look further (probe length doubles); turn the axes before calling it a minimum | `python -m unittest tests.test_probe_walk` |
 | `learned-step` | only the per-axis step sizes learned from predicted vs actual drop (no probes) | `python -m unittest tests.test_learned_step` |
-| `all-methods` | all four together, to compare them in one window | all of the above |
+| `jin-pgd` | Jin et al. (2017) perturbed GD: kick in a ball, stop if f did not drop by f_thres after t_thres steps | `python -m unittest tests.test_jin_pgd` |
+| `proposed` | the proposed method as one class with switches for each part: measured banded curvature (CPR), probe bag, capped kick, fading penalty, give-up rule, learned steps | `python -m unittest tests.test_proposed` |
+| `all-methods` | every branch merged, plus `experiments/run_grid.py` (the full test grid) | all of the above |
 
 ## Running
 
     make install                    # once: venv in ../venv + numpy, matplotlib
-    git checkout all-methods        # or gd, pgd, gdnc, probe
+    git checkout all-methods        # or any single method branch
     make test                       # the tests on this branch
     make run visual                 # 3D window, pick the method in the window
     make run headless ALG=all       # no window, prints a results table
 
-Settings (all optional): `ALG` (gd, pgd, gdnc, probe, probe_nesterov, probe_walk, learned_step or all), `FUNC` (assignment or star), `GAMMA` (> 0, default 1;
-headless takes a list like `GAMMA="1 0.1 0.01"`), `X0`, `Y0` (start, default (0.05, 1e-8)), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
+Settings (all optional): `ALG` (gd, pgd, gdnc, jin_pgd, probe, probe_nesterov, probe_walk, learned_step, proposed or all), `FUNC` (assignment or star), `GAMMA` (> 0, default 1;
+headless takes a list like `GAMMA="1 0.1 0.01"`), `X0`, `Y0` (start, default (0.05, 1e-8)), `ANGLE` (turn the 2D function by this many degrees, default 0), `K` (max updates), `SEED`, `G_TRIG`, `R`, `T`, `SPEED`
 (steps per second in the window). Example:
 
     make run headless ALG=pgd GAMMA=0.01 SEED=4 K=500
@@ -98,6 +100,23 @@ In the window: drag to **rotate** the 3D view, scroll to zoom. On the right: the
 **Reset**, and the numbers at the current point: k, z, f, f*, the gradient and its norm,
 the Hessian (n/a when the method does not use it) and the work Nf / Ng / NH. The numbers
 on screen are computed without counting, so they do not change the work.
+
+In the window the gamma, x0, y0 and angle boxes change the function and the start; press
+**Apply**. **Start at (0,0)** puts the start exactly on the saddle.
+
+## The full test grid (branch all-methods)
+
+    python experiments/run_grid.py --quick              # smoke test: small, finishes in ~2 minutes
+    python experiments/run_grid.py --workers 8          # everything: 4 functions x 3 gammas x 4 starts x every row
+
+Functions: `2d` (the assignment function), `2d_rot` (turned 45 deg), `100d_band` (100D,
+neighbours coupled), `100d_rand` (100D, random rotation). Gammas 1, 0.1, 0.01. Starts far,
+close, on (the saddle), near_min. Rows: the assignment baselines with every Q4 value,
+Jin et al. PGD, each part of the proposed method alone, the parts together, and the earlier
+variants. Pick a subset with `--functions`, `--gammas`, `--starts`, `--rows`; see `--help`.
+Every finished run is appended to `results/grid_runs.csv`, so a stopped run picks up where it
+left off. At the end `results/grid_results.xlsx` holds the tables (merged headers: function,
+then gamma, then start).
 
 Headless columns: `k_esc` = first k that is 10% of the way down from the saddle,
 `k_succ` = first k at a real minimum (gap <= 1e-4, |grad| <= 1e-5, no negative curvature),
