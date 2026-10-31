@@ -17,7 +17,7 @@ import inspect
 import time
 
 from saddle.algorithms import available, load
-from saddle.benchmark import FUNCTIONS
+from saddle.benchmark import FUNCTIONS, RotatedSaddle
 from saddle.cases import K, G_TRIG, R, T
 from saddle.metrics import evaluate
 
@@ -39,6 +39,8 @@ def parse():
                     help="one or more gammas > 0 (visual uses the first)")
     ap.add_argument("--x0", type=float, default=0.05, help="start x")
     ap.add_argument("--y0", type=float, default=1e-8, help="start y")
+    ap.add_argument("--angle", type=float, default=0.0,
+                    help="turn the assignment's function by this many degrees (e.g. 45)")
     ap.add_argument("--k", type=int, default=K, help="max number of updates")
     ap.add_argument("--seed", type=int, default=0, help="random seed (P-GD)")
     ap.add_argument("--g-trig", type=float, default=G_TRIG, help="'gradient is small' threshold")
@@ -57,11 +59,15 @@ def builder(args, gamma):
     start = (args.x0, args.y0)
     settings = dict(max_iters=args.k, seed=args.seed, g_trig=args.g_trig, r=args.r, T=args.t)
 
-    def build(name, gamma=gamma, z0=start):
+    def build(name, gamma=gamma, z0=start, angle=args.angle):
         cls = load(name)
         accepted = inspect.signature(cls.__init__).parameters
         kwargs = {key: val for key, val in settings.items() if key in accepted}
-        return cls(FUNCTIONS[args.func](gamma), z0, **kwargs)
+        if args.func == "assignment" and angle:
+            problem = RotatedSaddle.rotated_2d(gamma, angle)   # same function, turned
+        else:
+            problem = FUNCTIONS[args.func](gamma)
+        return cls(problem, z0, **kwargs)
 
     return build, start
 
@@ -99,7 +105,8 @@ def visual(args, build, names):
     from saddle.simulator import Simulator
 
     first = names[0]
-    sim = Simulator(build, available(), first, args.gamma[0], (args.x0, args.y0), speed=args.speed)
+    sim = Simulator(build, available(), first, args.gamma[0], (args.x0, args.y0),
+                    speed=args.speed, angle=args.angle)
     if args.frames is None:
         sim.show()
         return
