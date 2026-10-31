@@ -6,7 +6,7 @@
 #
 #   make experiments             everything below, one after the other
 #   make hw                      the assignment's tables (S1-S5, Question 4)  -> results/hw_results.xlsx
-#   make figures                 the assignment's 3 figures                   -> results/figures/
+#   make figures                 the assignment's 3 figures                   -> docs/figures/
 #   make cases                   the 27 cases, one run each + 2D pictures     -> results/cases_results.xlsx, docs/runs/
 #   After Question 4, pass your choices:  make hw PGD="T=50" GDNC="g_trig=1e-4"
 #

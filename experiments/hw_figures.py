@@ -2,6 +2,7 @@
 The figures the assignment asks for (page 4, after Question 4), all on S2
 (gamma = 0.1, start (0.05, 1e-8)):
 
+    (saved in docs/figures/, so the README shows them)
     1. s2_contours.png    contours of f with every method's path; the points where a
                           method perturbed / probed / took a curvature step are marked
     2. s2_gaps.png        normalized gap q_k = (f(z_k) - f*) / (f_s - f*) against k
@@ -112,7 +113,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--pgd", nargs="+", metavar="KEY=VALUE", help="chosen P-GD configuration")
     ap.add_argument("--gdnc", nargs="+", metavar="KEY=VALUE", help="chosen GD-NC configuration")
-    ap.add_argument("--out", default=os.path.join(os.path.dirname(HERE), "results", "figures"))
+    ap.add_argument("--out", default=os.path.join(os.path.dirname(HERE), "docs", "figures"))
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     chosen = {"P-GD": parse_settings(args.pgd), "GD-NC": parse_settings(args.gdnc)}
