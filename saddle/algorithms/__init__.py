@@ -14,10 +14,20 @@ import os
 HERE = os.path.dirname(__file__)
 NOT_METHODS = {"base"}
 
+# The methods the window's picker shows, in this order. None = every method on the branch.
+# (A branch with many methods can list only the ones being compared.)
+PICKER = None
+
 
 def available():
     """File names of all methods on this branch, e.g. ['gd', 'pgd']."""
     return sorted(m.name for m in pkgutil.iter_modules([HERE]) if m.name not in NOT_METHODS)
+
+
+def shown():
+    """The methods for the window's picker: PICKER if set (only those on this branch)."""
+    names = available()
+    return [n for n in PICKER if n in names] if PICKER else names
 
 
 def load(name):
