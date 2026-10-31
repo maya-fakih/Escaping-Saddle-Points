@@ -52,7 +52,7 @@ class LearnedStep(Algorithm):
 
     def setup(self):
         self.g = self.problem.grad(self.z)
-        self.d = np.ones(2)            # one step size per axis, start like GD (t = 1)
+        self.d = np.ones(len(self.z))  # one step size per axis, start like GD (t = 1)
 
     def update(self):
         self._learn_step_sizes()
@@ -66,7 +66,7 @@ class LearnedStep(Algorithm):
 
     def _learn_step_sizes(self):
         """Compare predicted and actual drop along each axis and adjust d_i."""
-        for i in range(2):
+        for i in range(len(self.z)):
             p = self.d[i] * self.g[i]**2
             if p < 1e-12:
                 continue
