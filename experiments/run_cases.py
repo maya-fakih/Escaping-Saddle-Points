@@ -28,7 +28,12 @@ WHAT IT WRITES (into results/)
   cases_results.xlsx  one sheet per measure, merged headers function -> gamma -> start:
                       Success, Escape k_esc, Success k_succ, Time to success, Final gap,
                       Work Nf-Ng-NH, Work to success, Rounds
-  If cases_runs.csv already has some runs, they are reused (so a stopped run can resume).
+  docs/runs/<function>/gamma<g>_<start>_<method>.png   (in docs/, so the README shows them)
+                      one picture per 2D run (seed 0 for random methods), drawn right
+                      after that run: contours, the path, and the method's numbers on
+                      the side (see pictures.py). --no-pictures skips them.
+  If cases_runs.csv already has some runs, they are reused (so a stopped run can resume);
+  a 2D run whose picture is missing is run again, only to draw it (2D runs are fast).
 """
 import argparse
 import csv
@@ -46,6 +51,7 @@ sys.path.insert(0, os.path.dirname(HERE))          # so "saddle" can be imported
 from saddle.algorithms import load                 # noqa: E402
 from saddle.benchmark import RotatedSaddle         # noqa: E402
 from saddle.metrics import evaluate                # noqa: E402
+import pictures                                    # noqa: E402
 
 N_BIG = 100                                        # size of the high-dimensional tests
 K = 3000
@@ -93,7 +99,7 @@ FIELDS = ["row", "function", "gamma", "start", "seed", "updates", "k_esc", "k_su
 # ----------------------------------------------------------------------------
 def one_run(job):
     """Run one method once on one test and return its numbers (one CSV line)."""
-    row, fkey, gamma, start, seed, iters = job
+    row, fkey, gamma, start, seed, iters, pic_dir = job
     _, _, _, module, settings, _ = METHODS[row]
     problem = FUNCTIONS[fkey][1](gamma)
     cls = load(module)
@@ -104,12 +110,19 @@ def one_run(job):
     algo = cls(problem, problem.start(start), **kwargs)
     algo.run()
     m = evaluate(algo)
+    if pic_dir and wants_picture(fkey, seed):          # drawn now, from this same run
+        pictures.draw(algo, m, METHODS[row], FUNCTIONS[fkey][0], fkey, gamma, start, pic_dir)
     m.update(row=row, function=fkey, gamma=gamma, start=start, seed=seed,
              seconds=round(time.perf_counter() - t0, 3))
     return {k: m.get(k) for k in FIELDS}
 
 
-def make_jobs(rows, functions, gammas, starts, seeds, iters):
+def wants_picture(fkey, seed):
+    """Pictures only for the 2D functions, and only one run per cell (seed 0)."""
+    return fkey in pictures.FUNCS_2D and seed == pictures.SEED
+
+
+def make_jobs(rows, functions, gammas, starts, seeds, iters, pic_dir=None):
     """Every (method, test, seed) to run. Deterministic methods get one seed only."""
     jobs = []
     for row in rows:
@@ -118,7 +131,7 @@ def make_jobs(rows, functions, gammas, starts, seeds, iters):
             for gamma in gammas:
                 for start in starts:
                     for seed in (seeds if random else seeds[:1]):
-                        jobs.append((row, fkey, gamma, start, seed, iters))
+                        jobs.append((row, fkey, gamma, start, seed, iters, pic_dir))
     return jobs
 
 
@@ -263,6 +276,7 @@ def main():
     ap.add_argument("--rows", nargs="+", type=int, default=list(range(len(METHODS))),
                     help="which method rows to run (0-based, see METHODS)")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(HERE), "results"))
+    ap.add_argument("--no-pictures", action="store_true", help="skip the 2D pictures")
     args = ap.parse_args()
 
     global N_BIG
@@ -275,9 +289,20 @@ def main():
     csv_path = os.path.join(args.out, "cases_runs.csv")
     xlsx_path = os.path.join(args.out, "cases_results.xlsx")
 
-    jobs = make_jobs(args.rows, args.functions, args.gammas, args.starts, seeds, iters)
+    # the pictures go into docs/runs (committed, so the README can show them);
+    # the quick test keeps its throw-away pictures in results/quick
+    pic_dir = None if args.no_pictures else (
+        os.path.join(args.out, "figures", "runs") if args.quick
+        else os.path.join(os.path.dirname(HERE), "docs", "runs"))
+    jobs = make_jobs(args.rows, args.functions, args.gammas, args.starts, seeds, iters, pic_dir)
     done = load_done(csv_path)
+
+    def picture_missing(j):
+        return pic_dir and wants_picture(j[1], j[4]) and not os.path.exists(
+            pictures.picture_path(pic_dir, j[1], j[2], j[3], METHODS[j[0]][3]))
+
     todo = [j for j in jobs if (j[0], j[1], j[2], j[3], j[4]) not in done]
+    redraw = [j for j in jobs if (j[0], j[1], j[2], j[3], j[4]) in done and picture_missing(j)]
     print(f"{len(jobs)} runs in these cases, {len(jobs) - len(todo)} already saved, "
           f"{len(todo)} to go, on {args.workers} cores")
 
@@ -293,9 +318,15 @@ def main():
             fh.flush()                                 # saved at once: safe to stop any time
             if i % 50 == 0 or i == len(todo):
                 print(f"  {i}/{len(todo)} done, {time.time() - t0:.0f} s")
+        if redraw:                                     # saved runs whose picture is missing
+            print(f"drawing {len(redraw)} missing pictures (running those 2D runs again)")
+            for _ in pool.imap_unordered(one_run, redraw):
+                pass
 
     write_excel(xlsx_path, load_done(csv_path), args.functions, args.gammas, args.starts)
     print("wrote", csv_path, "and", xlsx_path)
+    if pic_dir:
+        print("pictures in", pic_dir)
 
 
 def _set_size(n):
