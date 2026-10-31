@@ -119,12 +119,16 @@ class Probe(Algorithm):
             self.z, self.fz = best_z, best_f
             self.g = self.problem.grad(self.z)
             self.jumps.append(self.k)
+            self.log_round("escaped")
             self.fails = 0
         else:
             self.fails += 1
             if self.fails >= self.R:
                 self.stopped = True
                 self.giveups.append(self.k)
+                self.log_round("gave up")
+            else:
+                self.log_round("failed")
 
     def _learn_step_sizes(self):
         """2. Compare predicted and actual drop along each axis and adjust d_i."""
