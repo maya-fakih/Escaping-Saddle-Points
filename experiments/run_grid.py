@@ -1,0 +1,335 @@
+"""
+The full test grid: every method on every test, written into one Excel file.
+
+    python experiments/run_grid.py                  # everything (long: run it on a big machine)
+    python experiments/run_grid.py --quick          # a tiny slice, to check that it runs
+    python experiments/run_grid.py --workers 8      # use 8 CPU cores
+    python experiments/run_grid.py --functions 2d 2d_rot --gammas 0.1   # only part of it
+
+WHAT IT RUNS (the same layout as test-plan/test_plan.xlsx)
+  Columns, nested:  function  ->  gamma  ->  start
+      functions: 2D benchmark, 2D turned 45 degrees, 100D neighbours coupled,
+                 100D random rotation           (see RotatedSaddle in saddle/benchmark.py)
+      gammas:    1, 0.1, 0.01                   (the assignment's S1, S2, S3 values)
+      starts:    far, close, on saddle, near minimum
+  Rows: the METHODS list below: the assignment's baselines (with every Question 4
+  value), the paper's PGD, each part of the proposed method alone, the parts combined,
+  and the earlier variants.
+  The assignment's cases are cells of this grid: S1 = 2D, gamma 1, close;
+  S2 = 2D, gamma 0.1, close; S3 = 2D, gamma 0.01, close; S4 = 2D, gamma 1, on saddle;
+  S5 = 2D, gamma 1, near minimum.
+
+THE RULES (the assignment's, page 3)
+  K = 3000 updates, no early stop; random methods run 10 times with seeds 0..9,
+  deterministic ones once; mean +- sample standard deviation; "NR" when a target is
+  never met; "-" for the escape iteration at the near-minimum start; escape and success
+  numbers are averaged over the runs that reach them, final gap and work over all runs.
+
+WHAT IT WRITES (into results/)
+  grid_runs.csv       one line per run (every number, so nothing is lost)
+  grid_results.xlsx   one sheet per measure, in the test-plan layout:
+                      Success, Escape k_esc, Success k_succ, Time to success, Final gap,
+                      Work Nf-Ng-NH, Work to success, Rounds
+  If grid_runs.csv already has some runs, they are reused (so a stopped run can resume).
+"""
+import argparse
+import csv
+import inspect
+import os
+import sys
+import time
+from multiprocessing import Pool
+
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))          # so "saddle" can be imported
+
+from saddle.algorithms import load                 # noqa: E402
+from saddle.benchmark import RotatedSaddle         # noqa: E402
+from saddle.metrics import evaluate                # noqa: E402
+
+N_BIG = 100                                        # size of the high-dimensional tests
+K = 3000
+SEEDS = list(range(10))
+
+# ----------------------------------------------------------------------------
+# The columns
+# ----------------------------------------------------------------------------
+FUNCTIONS = {   # key: (title in the table, how to build it for a gamma)
+    "2d":        ("2D benchmark f_γ(x, y)",              lambda g: RotatedSaddle.plain(g)),
+    "2d_rot":    ("2D benchmark turned 45°",             lambda g: RotatedSaddle.rotated_2d(g, 45)),
+    "100d_band": ("100D, neighbouring coordinates coupled", lambda g: RotatedSaddle.coupled(N_BIG, g)),
+    "100d_rand": ("100D, random rotation",               lambda g: RotatedSaddle.random(N_BIG, g, seed=0)),
+}
+GAMMAS = [1.0, 0.1, 0.01]
+STARTS = {"far": "Far", "close": "Close", "on": "On saddle", "near_min": "Near minimum"}
+
+# ----------------------------------------------------------------------------
+# The rows: (family, method, parameters shown, file in saddle/algorithms, settings, random?)
+# "Proposed method" rows all use the same class with some parts switched off.
+# ----------------------------------------------------------------------------
+OFF = dict(kick=False, penalty=False)
+METHODS = [
+    ("Assignment baselines", "GD", "backtracking", "gd", {}, False),
+    ("Assignment baselines", "P-GD", "default: g_trig=1e-3, r=1e-2, T=20", "pgd", {}, True),
+    ("Assignment baselines", "P-GD", "g_trig = 1e-4", "pgd", dict(g_trig=1e-4), True),
+    ("Assignment baselines", "P-GD", "g_trig = 1e-2", "pgd", dict(g_trig=1e-2), True),
+    ("Assignment baselines", "P-GD", "r = 1e-3", "pgd", dict(r=1e-3), True),
+    ("Assignment baselines", "P-GD", "r = 5e-2", "pgd", dict(r=5e-2), True),
+    ("Assignment baselines", "P-GD", "T = 10", "pgd", dict(T=10), True),
+    ("Assignment baselines", "P-GD", "T = 50", "pgd", dict(T=50), True),
+    ("Assignment baselines", "GD-NC", "default: g_trig=1e-3", "gdnc", {}, False),
+    ("Assignment baselines", "GD-NC", "g_trig = 1e-4", "gdnc", dict(g_trig=1e-4), False),
+    ("Assignment baselines", "GD-NC", "g_trig = 1e-2", "gdnc", dict(g_trig=1e-2), False),
+    ("Literature", "Perturbed GD, Jin et al. 2017 (Algorithm 2)",
+     "r=1e-2, g_thres=1e-3, t_thres=20, f_thres=1e-7", "jin_pgd", {}, True),
+    ("Proposed method: each part alone", "Learned per-axis step size (ρ = actual / predicted drop)",
+     "κ=0.5, ω=2", "proposed", dict(learn_step=True, escape="none", **OFF), False),
+    ("Proposed method: each part alone", "Banded Hessian estimate, escape along its most negative direction",
+     "band b = 0 (diagonal)", "proposed", dict(band=0, escape="curvature", **OFF), False),
+    ("Proposed method: each part alone", "Banded Hessian estimate, escape along its most negative direction",
+     "band b = 1", "proposed", dict(band=1, escape="curvature", **OFF), False),
+    ("Proposed method: each part alone", "Banded Hessian estimate, escape along its most negative direction",
+     "band b = N-1 (full)", "proposed", dict(band="full", escape="curvature", **OFF), False),
+    ("Proposed method: each part alone", "Axis probes ±δ along every axis (2N probes)",
+     "δ = 1e-2", "proposed", dict(escape="axes", **OFF), False),
+    ("Proposed method: parts combined", "Banded Hessian + probe bag",
+     "b = 1, bag size m = 4", "proposed", dict(band=1, escape="bag", **OFF), False),
+    ("Proposed method: parts combined", "Banded Hessian + probe bag + capped uphill kick in a ball",
+     "kick radius r = 1e-2", "proposed", dict(band=1, escape="bag", kick=True, penalty=False), True),
+    ("Proposed method: parts combined", "Full proposed method: + fading direction penalty",
+     "p0 = 1e-4, β = 0.9", "proposed", dict(band=1, escape="bag", kick=True, penalty=True), True),
+    ("Proposed method: parts combined", "Full proposed method + learned step size",
+     "all parts on", "proposed", dict(band=1, escape="bag", kick=True, penalty=True,
+                                      learn_step=True), True),
+    ("Earlier variants", "Probe method (learned step + rotating axis probes)", "Oct 18 version",
+     "probe", {}, False),
+    ("Earlier variants", "Probe + Nesterov", "probe when stuck, Nesterov otherwise",
+     "probe_nesterov", {}, False),
+    ("Earlier variants", "Probe + walk", "flat probes: move and double δ", "probe_walk", {}, True),
+]
+
+FIELDS = ["row", "function", "gamma", "start", "seed", "updates", "k_esc", "k_succ", "t_succ",
+          "q", "nf", "ng", "nh", "nf_succ", "ng_succ", "nh_succ", "rounds", "escape_round",
+          "stuck_round", "rounds_to_min", "failed_at", "seconds"]
+
+
+# ----------------------------------------------------------------------------
+# Running
+# ----------------------------------------------------------------------------
+def one_run(job):
+    """Run one method once on one test and return its numbers (one CSV line)."""
+    row, fkey, gamma, start, seed, iters = job
+    _, _, _, module, settings, _ = METHODS[row]
+    problem = FUNCTIONS[fkey][1](gamma)
+    cls = load(module)
+    kwargs = dict(settings, max_iters=iters)
+    if "seed" in inspect.signature(cls.__init__).parameters:
+        kwargs["seed"] = seed
+    t0 = time.perf_counter()
+    algo = cls(problem, problem.start(start), **kwargs)
+    algo.run()
+    m = evaluate(algo)
+    m.update(row=row, function=fkey, gamma=gamma, start=start, seed=seed,
+             seconds=round(time.perf_counter() - t0, 3))
+    return {k: m.get(k) for k in FIELDS}
+
+
+def make_jobs(rows, functions, gammas, starts, seeds, iters):
+    """Every (method, test, seed) to run. Deterministic methods get one seed only."""
+    jobs = []
+    for row in rows:
+        random = METHODS[row][5]
+        for fkey in functions:
+            for gamma in gammas:
+                for start in starts:
+                    for seed in (seeds if random else seeds[:1]):
+                        jobs.append((row, fkey, gamma, start, seed, iters))
+    return jobs
+
+
+def load_done(path):
+    """Runs already saved in the CSV (so a stopped grid can carry on)."""
+    if not os.path.exists(path):
+        return {}
+    with open(path) as fh:
+        done = {}
+        for line in csv.DictReader(fh):
+            key = (int(line["row"]), line["function"], float(line["gamma"]), line["start"],
+                   int(line["seed"]))
+            done[key] = line
+        return done
+
+
+# ----------------------------------------------------------------------------
+# Summarizing, in the assignment's style
+# ----------------------------------------------------------------------------
+def num(v):
+    return None if v in (None, "", "None") else float(v)
+
+
+def mean_sd(values, fmt="{:.0f}"):
+    """'mean ± sd' over the values that exist; 'NR' if none; no sd if only one."""
+    vals = [v for v in values if v is not None]
+    if not vals:
+        return "NR"
+    if len(vals) == 1:
+        return fmt.format(vals[0])
+    return f"{fmt.format(np.mean(vals))} ± {fmt.format(np.std(vals, ddof=1))}"
+
+
+def summarize(runs, start):
+    """Every measure for one cell (one method on one test), as text."""
+    n = len(runs)
+    get = lambda key: [num(r[key]) for r in runs]
+    succ = sum(v is not None for v in get("k_succ"))
+    esc = [v for v in get("k_esc") if v is not None]
+    escape = "–" if start == "near_min" else mean_sd(esc)
+    if start != "near_min" and 0 < len(esc) < n:
+        escape += f" ({len(esc)}/{n} escape)"
+    work = " / ".join(mean_sd(get(k)) for k in ("nf", "ng", "nh"))
+    work_succ = " / ".join(mean_sd(get(k)) for k in ("nf_succ", "ng_succ", "nh_succ"))
+    rounds = " / ".join(mean_sd(get(k)) for k in ("escape_round", "stuck_round", "rounds_to_min"))
+    failed = [r for r in runs if num(r["failed_at"]) is not None]
+    if failed:
+        work += f" (line search failed in {len(failed)} run(s))"
+    return {
+        "Success": f"{succ}/{n}",
+        "Escape k_esc": escape,
+        "Success k_succ": mean_sd(get("k_succ")),
+        "Time to success": mean_sd(get("t_succ"), "{:.4f}"),
+        "Final gap": mean_sd(get("q"), "{:.1e}"),
+        "Work Nf-Ng-NH": work,
+        "Work to success": work_succ,
+        "Rounds": rounds,
+    }
+
+
+SHEET_NOTES = {
+    "Success": "runs that reach a real minimum at least once / runs",
+    "Escape k_esc": "first update 10% of the way down from the saddle (over runs that escape)",
+    "Success k_succ": "first update at a real minimum (over successful runs)",
+    "Time to success": "optimizer seconds at k_succ (over successful runs)",
+    "Final gap": "q_K = (f(z_K) - f*) / (f_saddle - f*) after all updates (over all runs)",
+    "Work Nf-Ng-NH": "f / gradient / Hessian evaluations in the whole run (over all runs)",
+    "Work to success": "f / gradient / Hessian evaluations up to k_succ",
+    "Rounds": "escape round / gave-up round / rounds before the minimum",
+}
+
+
+def write_excel(path, done, functions, gammas, starts):
+    """One sheet per measure, in the test-plan layout (merged, nested headers)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    cells = {}                                         # (row, f, g, s) -> summary dict
+    groups = {}
+    for (row, f, g, s, _), line in done.items():
+        groups.setdefault((row, f, g, s), []).append(line)
+    for key, runs in groups.items():
+        cells[key] = summarize(runs, key[3])
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    thin = Side(style="thin", color="999999")
+    box = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    fills = ["DCE6F1", "E2EFDA", "FCE4D6", "EDE7F6"]
+    for sheet, note in SHEET_NOTES.items():
+        ws = wb.create_sheet(sheet[:31])
+        ws.cell(1, 1, f"{sheet}: {note}").font = Font(bold=True)
+        top = 2
+        for c, title in enumerate(["Family", "Method", "Parameters"], start=1):
+            ws.merge_cells(start_row=top, start_column=c, end_row=top + 2, end_column=c)
+            ws.cell(top, c, title).font = Font(bold=True)
+        col = 4
+        colmap = {}
+        for fi, f in enumerate(functions):
+            fill = PatternFill("solid", fgColor=fills[fi % len(fills)])
+            width = len(gammas) * len(starts)
+            ws.merge_cells(start_row=top, start_column=col, end_row=top, end_column=col + width - 1)
+            ws.cell(top, col, FUNCTIONS[f][0]).fill = fill
+            for gi, g in enumerate(gammas):
+                gc = col + gi * len(starts)
+                ws.merge_cells(start_row=top + 1, start_column=gc, end_row=top + 1,
+                               end_column=gc + len(starts) - 1)
+                ws.cell(top + 1, gc, f"γ = {g:g}").fill = fill
+                for si, s in enumerate(starts):
+                    ws.cell(top + 2, gc + si, STARTS[s]).fill = fill
+                    colmap[(f, g, s)] = gc + si
+            col += width
+        for r, (fam, meth, par, *_rest) in enumerate(METHODS):
+            rr = top + 3 + r
+            ws.cell(rr, 1, fam); ws.cell(rr, 2, meth); ws.cell(rr, 3, par)
+            for (f, g, s), c in colmap.items():
+                if (r, f, g, s) in cells:
+                    ws.cell(rr, c, cells[(r, f, g, s)][sheet])
+        for row in ws.iter_rows(min_row=top, max_row=top + 2 + len(METHODS), max_col=col - 1):
+            for cell in row:
+                cell.border = box
+                cell.alignment = center if cell.column > 3 or cell.row < top + 3 else \
+                    Alignment(vertical="center", wrap_text=True)
+        ws.column_dimensions["A"].width, ws.column_dimensions["B"].width = 22, 40
+        ws.column_dimensions["C"].width = 28
+        for c in range(4, col):
+            ws.column_dimensions[ws.cell(1, c).column_letter].width = 14
+        ws.freeze_panes = ws.cell(top + 3, 4)
+    wb.save(path)
+
+
+# ----------------------------------------------------------------------------
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
+    ap.add_argument("--quick", action="store_true",
+                    help="tiny smoke test: 2 seeds, 50 updates, gamma 0.1, 10D instead of 100D")
+    ap.add_argument("--workers", type=int, default=os.cpu_count(), help="CPU cores to use")
+    ap.add_argument("--functions", nargs="+", default=list(FUNCTIONS), choices=FUNCTIONS)
+    ap.add_argument("--gammas", nargs="+", type=float, default=GAMMAS)
+    ap.add_argument("--starts", nargs="+", default=list(STARTS), choices=STARTS)
+    ap.add_argument("--rows", nargs="+", type=int, default=list(range(len(METHODS))),
+                    help="which method rows to run (0-based, see METHODS)")
+    ap.add_argument("--out", default=os.path.join(os.path.dirname(HERE), "results"))
+    args = ap.parse_args()
+
+    global N_BIG
+    seeds, iters = SEEDS, K
+    if args.quick:
+        N_BIG, seeds, iters = 10, SEEDS[:2], 50
+        args.gammas = [0.1]
+        args.out = os.path.join(args.out, "quick")
+    os.makedirs(args.out, exist_ok=True)
+    csv_path = os.path.join(args.out, "grid_runs.csv")
+    xlsx_path = os.path.join(args.out, "grid_results.xlsx")
+
+    jobs = make_jobs(args.rows, args.functions, args.gammas, args.starts, seeds, iters)
+    done = load_done(csv_path)
+    todo = [j for j in jobs if (j[0], j[1], j[2], j[3], j[4]) not in done]
+    print(f"{len(jobs)} runs in this grid, {len(jobs) - len(todo)} already saved, "
+          f"{len(todo)} to go, on {args.workers} cores")
+
+    new_file = not os.path.exists(csv_path)
+    with open(csv_path, "a", newline="") as fh, Pool(args.workers, initializer=_set_size,
+                                                    initargs=(N_BIG,)) as pool:
+        writer = csv.DictWriter(fh, fieldnames=FIELDS)
+        if new_file:
+            writer.writeheader()
+        t0 = time.time()
+        for i, line in enumerate(pool.imap_unordered(one_run, todo), start=1):
+            writer.writerow(line)
+            fh.flush()                                 # saved at once: safe to stop any time
+            if i % 50 == 0 or i == len(todo):
+                print(f"  {i}/{len(todo)} done, {time.time() - t0:.0f} s")
+
+    write_excel(xlsx_path, load_done(csv_path), args.functions, args.gammas, args.starts)
+    print("wrote", csv_path, "and", xlsx_path)
+
+
+def _set_size(n):
+    """Each worker process needs the same 100D size (the quick test makes it smaller)."""
+    global N_BIG
+    N_BIG = n
+
+
+if __name__ == "__main__":
+    main()
