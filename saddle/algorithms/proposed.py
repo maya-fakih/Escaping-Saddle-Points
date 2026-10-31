@@ -16,8 +16,24 @@ THE STORY (why each part exists)
     and every bit of curvature we measure can only narrow the search.
 
 THE PARTS (each one can be switched on or off, so we can test what each part buys)
-  1. learn_step   per-axis step sizes learned from "actual drop / predicted drop"
-                  (rho), our first idea. Used in every GD step when on.
+  1. learn_step   step sizes learned from "actual drop / predicted drop" (rho), our
+                  first idea. Used in every GD step when on. Two versions:
+                    "axes"       one step size per coordinate axis (the first version).
+                                 Fine when the function's valleys line up with the
+                                 axes; when the function is turned, a step that fits
+                                 one axis overshoots across the diagonal valley and
+                                 the path zigzags.
+                    "curvature"  one step size per eigen-direction of the measured B
+                                 (part 2). These directions turn with the function,
+                                 so the steps fit the valley in any rotation. Each
+                                 step size starts at 1 / |lambda| (the curvature B
+                                 measured along it; a direction that curves down gets
+                                 a big step, and rho then grows it further), and rho
+                                 corrects it from there. B is measured again every
+                                 basis_every updates, because the curvature changes
+                                 as we move.
+                  True means "axes" (kept so the older settings still work).
+                  The default is "curvature": the window runs the full method.
   2. band b       a banded Hessian estimate B, measured from gradient differences
                   (Curtis, Powell & Reid 1974): with band b (only entries |i - j| <= b
                   are kept) it costs min(2b + 1, N) extra gradients, whatever N is.
@@ -63,7 +79,8 @@ COST (all counted in Nf / Ng / NH; no Hessian is ever computed)
   - measuring B: min(2b + 1, N) gradients per stuck round
   - probing: 2 f per direction (2N for "axes", 2 * bag_size for "bag")
   - kick: 1 f per halving of the kick length
-  - learned step: 1 f per axis per update
+  - learned step: 1 f per direction per update; "curvature" also measures B every
+    basis_every updates (min(2b + 1, N) gradients)
 """
 import numpy as np
 
@@ -77,11 +94,14 @@ class Proposed(Algorithm):
     name = "Proposed"
 
     def __init__(self, problem, z0, max_iters=3000, seed=0, g_trig=G_TRIG,
-                 learn_step=False, band=1, escape="bag", bag_size=4, kick=True, penalty=True,
+                 learn_step="curvature", band=1, escape="bag", bag_size=4, kick=True, penalty=True,
                  delta=1e-2, r=R_DEFAULT, R=3, h=1e-5, p0=1e-4, beta=0.9, eps_f=1e-12,
-                 kappa=0.5, omega=2.0, d_min=1e-6, d_max=100.0):
+                 kappa=0.5, omega=2.0, d_min=1e-6, d_max=100.0, basis_every=20):
         # which parts are on
+        if learn_step is True:                   # the older setting meant per-axis steps
+            learn_step = "axes"
         self.learn_step, self.escape, self.kick, self.penalty = learn_step, escape, kick, penalty
+        self.basis_every = basis_every            # how often B is measured again for the steps
         self.band = band                  # None = never measured; "full" or N-1 = full matrix
         self.bag_size = bag_size
         # sizes and thresholds
@@ -96,7 +116,10 @@ class Proposed(Algorithm):
         n = len(self.z)
         self.rng = np.random.default_rng(self.seed)   # used only to pick a kick direction
         self.g = self.problem.grad(self.z)
-        self.d = np.ones(n)                           # per-axis step sizes (learn_step)
+        self.d = np.ones(n)                           # one step size per direction (learn_step)
+        self.V = None                                 # the step directions: None = the axes,
+                                                      # else the columns are B's eigenvectors
+        self.basis_k = None                           # update number when B was last measured
         self.p = np.zeros(n)                          # per-axis penalties (penalty)
         self.fails = 0                                # search rounds in a row with no drop
         self.anchor = None                            # best point of the current search
@@ -109,6 +132,9 @@ class Proposed(Algorithm):
         """One update: (search if stuck) then one GD step."""
         self.p *= self.beta                           # old penalties fade a little
 
+        if self.learn_step == "curvature" and (
+                self.basis_k is None or self.k - self.basis_k >= self.basis_every):
+            self._set_basis(self.measure_curvature())  # the curvature changed: re-measure
         if self.learn_step:
             self._learn_step_sizes()
 
@@ -125,10 +151,16 @@ class Proposed(Algorithm):
         return self._gd_step()
 
     # ------------------------------------------------------------------
-    # the GD step (plain, or scaled per axis when learn_step is on)
+    # the GD step (plain, or scaled per direction when learn_step is on)
     def _gd_step(self):
-        step = -self.d * self.g
-        z_new, f_new = self.backtrack(self.z, self.fz, step, self.g @ (self.d * self.g))
+        if self.V is None:                            # directions = the axes
+            step, slope = -self.d * self.g, self.g @ (self.d * self.g)
+        else:
+            # write g in B's directions (gb_i = how much of g lies along direction i),
+            # scale each part by its own step size, then turn back to x, y, ...
+            gb = self.V.T @ self.g
+            step, slope = -self.V @ (self.d * gb), gb @ (self.d * gb)
+        z_new, f_new = self.backtrack(self.z, self.fz, step, slope)
         if z_new is None:
             return False
         self._move(z_new, f_new)
@@ -169,10 +201,25 @@ class Proposed(Algorithm):
                 B[lo:hi, j] = y[lo:hi]
         return 0.5 * (B + B.T)                        # a Hessian is symmetric
 
+    def _set_basis(self, B):
+        """learn_step = "curvature": make B's eigenvectors the step directions.
+        Each step size starts at 1 / |lambda|: along a direction that curves up with
+        curvature lambda, 1 / lambda lands on the bottom of that parabola (Newton's
+        step); along one that curves down, 1 / |lambda| is a big step away from the
+        saddle, and rho keeps growing it while f keeps dropping faster than predicted.
+        Nearly flat directions (|lambda| tiny) start at the largest allowed step."""
+        lam, V = np.linalg.eigh(B)
+        self.V = V
+        self.d = np.clip(1.0 / np.maximum(np.abs(lam), 1.0 / self.d_max), self.d_min, self.d_max)
+        self.basis_k = self.k
+
     # ------------------------------------------------------------------
     # escape = "curvature": GD-NC, but with the measured B
     def _curvature_step(self):
-        lam, V = np.linalg.eigh(self.measure_curvature())
+        B = self.measure_curvature()
+        if self.learn_step == "curvature":
+            self._set_basis(B)                        # measured anyway: reuse it for the steps
+        lam, V = np.linalg.eigh(B)
         lam, v = lam[0], V[:, 0]                      # smallest eigenvalue and its direction
         if lam >= NEG_CURVATURE:
             # B sees no direction that curves down: call it a minimum, take the GD step
@@ -199,7 +246,10 @@ class Proposed(Algorithm):
         n = len(self.z)
         if self.escape == "axes":
             return np.eye(n)                          # every coordinate axis: 2N probes
-        lam, V = np.linalg.eigh(self.measure_curvature())
+        B = self.measure_curvature()
+        if self.learn_step == "curvature":
+            self._set_basis(B)                        # measured anyway: reuse it for the steps
+        lam, V = np.linalg.eigh(B)
         return V[:, :min(self.bag_size, n)]           # where B curves down the most
 
     def _penalty_of(self, v):
@@ -285,17 +335,23 @@ class Proposed(Algorithm):
             self.p = np.maximum(self.p, self.p0 * v**2)
 
     # ------------------------------------------------------------------
-    # part 1: the learned per-axis step sizes (same rule as the learned-step method)
+    # part 1: the learned step sizes (same rule as the learned-step method)
     def _learn_step_sizes(self):
-        """For each axis: predicted drop d_i g_i^2 vs the actual drop of the move along
-        that axis alone; rho = actual / predicted = 1 - d_i H_i / 2. Move d_i toward
-        1 / H_i, or grow it when the axis curves down (rho >= 1)."""
+        """For each direction v_i (an axis, or one of B's eigenvectors): c_i = g . v_i
+        is how much of the gradient lies along it. Predicted drop of the move along v_i
+        alone: d_i c_i^2; compare with the actual drop; rho = actual / predicted =
+        1 - d_i H_i / 2, where H_i is the curvature along v_i. Move d_i toward 1 / H_i,
+        or grow it when the direction curves down (rho >= 1)."""
         for i in range(len(self.z)):
-            pred = self.d[i] * self.g[i]**2
+            c = self.g[i] if self.V is None else self.V[:, i] @ self.g
+            pred = self.d[i] * c**2
             if pred < 1e-12:                          # too small to measure: rounding noise
                 continue
-            zi = self.z.copy()
-            zi[i] -= self.d[i] * self.g[i]
+            if self.V is None:
+                zi = self.z.copy()
+                zi[i] -= self.d[i] * c
+            else:
+                zi = self.z - self.d[i] * c * self.V[:, i]
             rho = (self.fz - self.problem.f(zi)) / pred
             factor = np.clip((1.0 / (2 * (1 - rho)))**self.kappa, 0.1, 10.0) if rho < 1 \
                 else self.omega
