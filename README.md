@@ -154,3 +154,9 @@ Normalized gap q_k = (f(z_k) − f*) / Δ, with Δ = f_s − f*. Reported: escap
 
 - C. Jin et al., *How to Escape Saddle Points Efficiently*, ICML 2017
 - J. D. Lee et al., *Gradient Descent Only Converges to Minimizers*, COLT 2016
+## Dimension-dependent LDH-GD search budget
+
+LDH-GD now defaults to `R(n) = max(3, ceil(sqrt(n)))`: 3 failed search
+rounds in 2D, 10 in 100D. Explicit constructor overrides such as `R=3`
+remain supported. See [the budget rule and reproduction notes](docs/search_budget.md).
+Archived experiment tables predate this default change.

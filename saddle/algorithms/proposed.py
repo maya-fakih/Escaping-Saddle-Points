@@ -80,7 +80,7 @@ ONE UPDATE
                                              -> jump there ("escaped")
           - nothing drops, kick is on        -> kick uphill along one bag direction
           - nothing drops, kick is off       -> count a failed round
-        After R rounds in a row with no drop: "very likely a minimum" ("gave up"):
+        After R = max(3, ceil(sqrt(N))) rounds in a row with no drop (unless overridden): "very likely a minimum" ("gave up"):
         go back to the best point of this search and stop searching until the
         gradient is large again (we have left the flat region).
   - Then one GD step with backtracking (scaled by d if learn_step is on).
@@ -106,7 +106,7 @@ class Proposed(Algorithm):
 
     def __init__(self, problem, z0, max_iters=3000, seed=0, g_trig=G_TRIG,
                  learn_step="axes", band=1, escape="bag", bag_size=4, kick=True, penalty=True,
-                 delta=1e-2, r=R_DEFAULT, R=3, h=1e-5, p0=1e-4, beta=0.9, eps_f=1e-12,
+                 delta=1e-2, r=R_DEFAULT, R=None, h=1e-5, p0=1e-4, beta=0.9, eps_f=1e-12,
                  kappa=0.5, omega=2.0, d_min=1e-6, d_max=100.0, basis_every=20, L=1.0):
         # which parts are on
         if learn_step is True:                   # the older setting meant per-axis steps
@@ -120,7 +120,9 @@ class Proposed(Algorithm):
         self.band = band                  # None = never measured; "full" or N-1 = full matrix
         self.bag_size = bag_size
         # sizes and thresholds
-        self.seed, self.g_trig, self.delta, self.r, self.R = seed, g_trig, delta, r, R
+        # Default failed-search budget grows with dimension; explicit R overrides it.
+        rounds = max(3, int(np.ceil(np.sqrt(len(z0))))) if R is None else R
+        self.seed, self.g_trig, self.delta, self.r, self.R = seed, g_trig, delta, r, rounds
         self.h, self.p0, self.beta, self.eps_f = h, p0, beta, eps_f
         self.kappa, self.omega, self.d_min, self.d_max = kappa, omega, d_min, d_max
         super().__init__(problem, z0, max_iters)
