@@ -46,10 +46,12 @@ class PGD(Algorithm):
     def update(self):
         w, fw, gw = self.z, self.fz, self.g
         if np.linalg.norm(self.g) <= self.g_trig and self.k - self.last_kick >= self.T:
-            # uniform point in a disk: random direction, radius r*sqrt(u)
-            v = self.rng.standard_normal(2)
+            # uniform point in a ball of radius r: random direction, radius r * u^(1/n)
+            # (in 2D, u^(1/2) = sqrt(u): exactly the assignment's disk rule)
+            n = len(self.z)
+            v = self.rng.standard_normal(n)
             u = self.rng.uniform()
-            w = self.z + self.r * np.sqrt(u) * v / np.linalg.norm(v)
+            w = self.z + self.r * u**(1.0 / n) * v / np.linalg.norm(v)
             fw, gw = self.problem.f(w), self.problem.grad(w)
             self.last_kick = self.k
             self.kicks.append(self.k)
