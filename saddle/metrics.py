@@ -13,9 +13,11 @@ Delta = f_s - f*  (how far down the minimum is below the saddle).
 
 These checks use the uncounted peek_* functions, so they do not add to Nf/Ng/NH.
 
-For methods that probe (see Algorithm.log_round), rounds are numbered 1, 2, 3, ...:
-  rounds         = how many probe rounds in the whole run
-  escape round   = round number of the first jump to a lower point
+For methods with an escape move (probes, kicks, curvature steps; see Algorithm.log_round),
+each try is one "round", numbered 1, 2, 3, ...:
+  rounds         = how many rounds in the whole run
+  escape round   = how many rounds it took to escape: the rounds done before k_esc
+                   (works the same for jumps, kicks and curvature steps)
   stuck round    = round number of the first "gave up" (called it a minimum)
   rounds to min  = how many rounds were done before the point first reached a minimum
 """
@@ -32,12 +34,15 @@ def at_minimum(P, z):
     return np.linalg.eigvalsh(P.peek_hess(z))[0] >= -1e-4
 
 
-def probe_rounds(log, k_succ=None):
-    """Summarize a probe log [(k, outcome), ...]. Round numbers start at 1; None = never."""
+def probe_rounds(log, k_succ=None, k_esc=None):
+    """Summarize a round log [(k, outcome), ...]. Round numbers start at 1; None = never.
+    Without k_esc (the live window), the escape round is the first "escaped" round."""
     first = lambda outcome: next((i + 1 for i, (_, o) in enumerate(log) if o == outcome), None)
-    to_min = None if k_succ is None or not log else sum(1 for k, _ in log if k < k_succ)
-    return dict(rounds=len(log), escape_round=first("escaped"), stuck_round=first("gave up"),
-                rounds_to_min=to_min)
+    rounds_before = lambda k_end: None if k_end is None or not log else \
+        sum(1 for k, _ in log if k < k_end)
+    escape = first("escaped") if k_esc is None else rounds_before(k_esc)
+    return dict(rounds=len(log), escape_round=escape, stuck_round=first("gave up"),
+                rounds_to_min=rounds_before(k_succ))
 
 
 def evaluate(algo):
@@ -60,4 +65,4 @@ def evaluate(algo):
     return dict(updates=algo.k, k_esc=k_esc, k_succ=k_succ, z=Z[-1], f=f[-1], q=q[-1],
                 nf=nf, ng=ng, nh=nh, failed_at=algo.failed_at,
                 nf_succ=w[0], ng_succ=w[1], nh_succ=w[2], t_succ=t_succ,
-                **probe_rounds(algo.probe_log, k_succ))
+                **probe_rounds(algo.probe_log, k_succ, k_esc))
