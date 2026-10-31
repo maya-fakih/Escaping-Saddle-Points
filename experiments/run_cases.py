@@ -18,7 +18,7 @@ WHAT IT RUNS
   The assignment's own tables (S1-S5, Question 4) are made by run_hw.py.
 
 THE RULES (the assignment's, page 3)
-  K = 3000 updates, no early stop; random methods run 10 times with seeds 0..9,
+  K = 3000 updates, no early stop; ONE run per cell (seed 0; --seeds N for more),
   deterministic ones once; mean +- sample standard deviation; "NR" when a target is
   never met; "-" for the escape iteration at the near-minimum start; escape and success
   numbers are averaged over the runs that reach them, final gap and work over all runs.
@@ -277,7 +277,7 @@ def main():
                     help="which method rows to run (0-based, see METHODS)")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(HERE), "results"))
     ap.add_argument("--no-pictures", action="store_true", help="skip the 2D pictures")
-    ap.add_argument("--seeds", type=int, default=len(SEEDS),
+    ap.add_argument("--seeds", type=int, default=1,
                     help="runs per random method (seeds 0..N-1); 1 = one run per cell")
     args = ap.parse_args()
 
