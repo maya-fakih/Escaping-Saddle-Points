@@ -1,0 +1,32 @@
+{
+  "dimension": 100,
+  "rotation_seed": 0,
+  "gammas": [
+    1.0,
+    0.1,
+    0.01
+  ],
+  "starts": [
+    "close",
+    "on"
+  ],
+  "seeds": [
+    0,
+    1
+  ],
+  "K": 3000,
+  "LDH_R": 10,
+  "g_trig": 0.001,
+  "r": 0.01,
+  "T": 20,
+  "jin_f_thres": 1e-07,
+  "source_sha256": {
+    "benchmark.py": "b79c725bc77ab6d32e443ac6b06a830e79f25d5809fee1e4c02ea5587295780d",
+    "metrics.py": "82484c75b9189ed86fc2a171c29820b83cdccad4897ab0e44821112acd759794",
+    "algorithms/base.py": "5d0eee6bcbe7ec14719496f5dc940813dae0bc69eb5dd4f5910da6fab6c8dc3c",
+    "algorithms/proposed.py": "3e85f167339c6709febfb4ea53037ab7ced319fe6b2c0d07c4dabdd0e910d754",
+    "algorithms/ldh.py": "c37894bbff54afce9c41ad1a5412cd9a9abe054bd139f38f166c5b4e5215cf12",
+    "algorithms/pgd.py": "82765791010e1f6f979b2071bd37240925bb7942c9c94bd4225e7efaaa17ec16",
+    "algorithms/jin_pgd.py": "d41d957746eaa976debddc1b26dfcd66e5189a3e9b516913cdc2305e0d09cdc5"
+  }
+}
