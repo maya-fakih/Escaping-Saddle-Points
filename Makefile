@@ -2,6 +2,9 @@
 #   make install                 create the venv in ../venv and install numpy, matplotlib, openpyxl, scipy
 #   make run visual  ALG=gd      open the 3D simulator (you can switch method in the window)
 #   make run headless ALG=all    no window, print a results table at the end
+#   make compare-100d            compare LDH-GD and both P-GD methods (2 seeds)
+#   make compare-100d SEEDS="0"  use just one seed
+#   make compare-100d RESUME=1   resume interrupted comparisons
 #   make test                    run the tests on this branch
 #
 #   make experiments             everything below, one after the other
@@ -35,6 +38,8 @@ T      ?= 20
 SPEED  ?= 5
 PGD    ?=
 GDNC   ?=
+SEEDS  ?= 0 1
+RESUME ?= 0
 CHOSEN := $(if $(PGD),--pgd $(PGD)) $(if $(GDNC),--gdnc $(GDNC))
 
 ARGS := --alg $(ALG) --func $(FUNC) --gamma $(GAMMA) --x0 $(X0) --y0 $(Y0) --angle $(ANGLE) --k $(K) --seed $(SEED) --g-trig $(G_TRIG) \
@@ -43,7 +48,7 @@ ARGS := --alg $(ALG) --func $(FUNC) --gamma $(GAMMA) --x0 $(X0) --y0 $(Y0) --ang
 # "make run headless" -> headless; "make run" or "make run visual" -> visual
 MODE := $(if $(filter headless,$(MAKECMDGOALS)),headless,visual)
 
-.PHONY: install run visual headless test clean experiments hw figures cases
+.PHONY: install run visual headless test clean experiments hw figures cases compare-100d
 
 install:
 	mkdir -p $(VENV)
@@ -71,6 +76,9 @@ figures:
 
 cases:
 	$(PY) experiments/run_cases.py
+
+compare-100d:
+	$(PY) experiments/compare_100d.py --seeds $(SEEDS) --k $(K) $(if $(filter 1,$(RESUME)),--resume)
 
 clean:
 	rm -rf __pycache__ */__pycache__ */*/__pycache__ tests/__pycache__ frame_*.png
