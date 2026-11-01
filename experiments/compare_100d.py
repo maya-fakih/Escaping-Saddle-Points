@@ -4,7 +4,7 @@ Run from the repository root:
     ../venv/bin/python experiments/compare_100d.py
 
 Defaults: one fixed dense rotation (seed 0), gamma 1/0.1/0.01, near/exact
-saddle starts, optimizer seeds 0-9, and 3000 updates: 180 runs. No plain GD.
+saddle starts, optimizer seeds 0 and 1, and 3000 updates: 36 runs. No plain GD.
 The Jin baseline is the repository's backtracking/fixed-threshold adaptation,
 not the theoretically calibrated fixed-step Algorithm 2 from the paper.
 """
@@ -89,7 +89,7 @@ def main():
                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--gammas", nargs="+", type=float, default=[1.0, 0.1, 0.01])
     parser.add_argument("--starts", nargs="+", choices=["close", "on"], default=["close", "on"])
-    parser.add_argument("--seeds", nargs="+", type=int, default=list(range(10)))
+    parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
     parser.add_argument("--rotation-seed", type=int, default=0)
     parser.add_argument("--k", type=int, default=3000)
     parser.add_argument("--out", type=Path, default=ROOT / "results" / "comparison_100d")
