@@ -86,5 +86,9 @@ compare-100d:
 compare-100d-all:
 	$(PY) experiments/compare_100d_all.py --seeds $(SEEDS) --k $(K) --rounds $(ROUNDS) --out $(COMPARE_OUT)
 
+.PHONY: check-probe-tie
+check-probe-tie:
+	$(PY) experiments/check_probe_tie.py
+
 clean:
 	rm -rf __pycache__ */__pycache__ */*/__pycache__ tests/__pycache__ frame_*.png

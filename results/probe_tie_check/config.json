@@ -1,0 +1,9 @@
+{
+  "tie_tol": 1e-12,
+  "rule": "No descending selected probe: move only if ALL raw probe objective values tie within absolute tolerance; otherwise stay and count failure.",
+  "R_2D": 3,
+  "R_100D": 20,
+  "rotation_seed_100D": 0,
+  "K": 3000,
+  "note": "No random kicks. Two 100D seeds repeat an identical deterministic trajectory; they are timing repeats. Earlier random-kick LDH remains unchanged."
+}
