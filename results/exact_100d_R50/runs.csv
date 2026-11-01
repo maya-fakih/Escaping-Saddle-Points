@@ -1,0 +1,2 @@
+gamma,start,method,seed,updates,k_esc,k_succ,t_succ,q,nf,ng,nh,nf_succ,ng_succ,nh_succ,failed_at,search_rounds,kick_count,gave_up,optimizer_seconds
+0.01,on,LDH-GD deterministic R50,,3000,162,526,0.8830633369980205,4.0657581468206416e-16,94509,3200,0,49271,726,0,,50,0,True,1.4411640399976022

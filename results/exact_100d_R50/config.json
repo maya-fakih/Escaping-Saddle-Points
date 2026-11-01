@@ -1,0 +1,11 @@
+{
+  "dimension": 100,
+  "gamma": 0.01,
+  "start": "exact saddle",
+  "rotation_seed": 0,
+  "optimizer_randomness": "none",
+  "R": 50,
+  "K": 3000,
+  "best_probe": true,
+  "kick": false
+}
