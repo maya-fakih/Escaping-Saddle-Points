@@ -100,7 +100,8 @@ def write_excel(rows, config, output_path):
         headers.extend([metric + "_n", metric + "_mean", metric + "_sample_sd"])
     summary_sheet.append(headers)
     def numbers(group, metric):
-        return [float(r[metric]) for r in group
+        return [float(str(r[metric]).lower() == 'true') if metric == 'gave_up'
+                and isinstance(r[metric], str) else float(r[metric]) for r in group
                 if r.get(metric) not in (None, "")]
     groups = {}
     for row in rows:

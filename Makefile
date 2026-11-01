@@ -40,6 +40,8 @@ PGD    ?=
 GDNC   ?=
 SEEDS  ?= 0 1
 RESUME ?= 0
+ROUNDS ?= 20
+COMPARE_OUT ?= results/comparison_100d_all_local
 CHOSEN := $(if $(PGD),--pgd $(PGD)) $(if $(GDNC),--gdnc $(GDNC))
 
 ARGS := --alg $(ALG) --func $(FUNC) --gamma $(GAMMA) --x0 $(X0) --y0 $(Y0) --angle $(ANGLE) --k $(K) --seed $(SEED) --g-trig $(G_TRIG) \
@@ -79,6 +81,10 @@ cases:
 
 compare-100d:
 	$(PY) experiments/compare_100d.py --seeds $(SEEDS) --k $(K) $(if $(filter 1,$(RESUME)),--resume)
+
+.PHONY: compare-100d-all
+compare-100d-all:
+	$(PY) experiments/compare_100d_all.py --seeds $(SEEDS) --k $(K) --rounds $(ROUNDS) --out $(COMPARE_OUT)
 
 clean:
 	rm -rf __pycache__ */__pycache__ */*/__pycache__ tests/__pycache__ frame_*.png

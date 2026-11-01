@@ -1,0 +1,42 @@
+{
+  "dimension": 100,
+  "rotation_seed": 0,
+  "gammas": [
+    1.0,
+    0.1,
+    0.01
+  ],
+  "starts": [
+    "close",
+    "on"
+  ],
+  "seeds": [
+    0,
+    1
+  ],
+  "K": 3000,
+  "LDH_R": 20,
+  "timing": "Same machine, single BLAS thread; optimizer updates only, diagnostics and initialization excluded.",
+  "deterministic_note": "GD-NC seeds are timing repeats; its trajectory is deterministic.",
+  "retries_note": "R caps consecutive failed rounds per search episode, not total lifetime rounds. Counts to success exclude later searches.",
+  "source_sha256": {
+    "saddle/__init__.py": "6afe772bfce0525a3ea18e4bec3bae89a510ab1a23c08df740d19d03e53c4d9e",
+    "saddle/algorithms/__init__.py": "ad4e93a7d8159de7fd9aceb1513b927cd645fcf9a7a6925e8f1316322799e265",
+    "saddle/algorithms/base.py": "5d0eee6bcbe7ec14719496f5dc940813dae0bc69eb5dd4f5910da6fab6c8dc3c",
+    "saddle/algorithms/gd.py": "0de4310f4e48e120ca763a8fc1a90178bfdbc238ea995a33a3e800e3cc8c23a8",
+    "saddle/algorithms/gdnc.py": "5d5ac5c30f4debe14252167aef781b5048c76185828cca2c0c37bdf3038a1c68",
+    "saddle/algorithms/jin_pgd.py": "d41d957746eaa976debddc1b26dfcd66e5189a3e9b516913cdc2305e0d09cdc5",
+    "saddle/algorithms/ldh.py": "c37894bbff54afce9c41ad1a5412cd9a9abe054bd139f38f166c5b4e5215cf12",
+    "saddle/algorithms/ldh_guessed.py": "91c4f8d892f0d5d3a1cb0b54cc06ef6f1059e9980b876556d41cc54ce3be0f95",
+    "saddle/algorithms/learned_step.py": "b4f63d0a07e225db616af6f117c20ccd05cff21b8810ddaeb6114a20af822238",
+    "saddle/algorithms/pgd.py": "82765791010e1f6f979b2071bd37240925bb7942c9c94bd4225e7efaaa17ec16",
+    "saddle/algorithms/probe.py": "8c0d10b91eeb3e00cae043a90ca7ca241a5cdd4506c6dd5fa97ea3f9b6d145c2",
+    "saddle/algorithms/probe_nesterov.py": "dba961ec96f01cccc8af6b2c6254593d1a2c46717a6e56b5d04497de7ed57026",
+    "saddle/algorithms/probe_walk.py": "f6ceb451393701a5813a4d1a84780384147916169fbb2bb7205295e86c30ed6f",
+    "saddle/algorithms/proposed.py": "3e85f167339c6709febfb4ea53037ab7ced319fe6b2c0d07c4dabdd0e910d754",
+    "saddle/benchmark.py": "b79c725bc77ab6d32e443ac6b06a830e79f25d5809fee1e4c02ea5587295780d",
+    "saddle/cases.py": "8a22f19237f579a3dd2c7af8d1beee2fa6a1bf923b880d6f21c9f8fe63abdbd9",
+    "saddle/metrics.py": "82484c75b9189ed86fc2a171c29820b83cdccad4897ab0e44821112acd759794",
+    "saddle/simulator.py": "475cb39c0f7225a3379d8d4f6ac513dec455bbcd7afaf7ebf518af748d3eda40"
+  }
+}
