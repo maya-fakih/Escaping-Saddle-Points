@@ -1,0 +1,30 @@
+{
+  "K": 3000,
+  "LDH_R_2D": 3,
+  "LDH_R_100D": 20,
+  "optimizer_randomness": "None; one trajectory per case",
+  "rotation": "Fixed 100D Q constructed with seed 0; not an optimizer repetition",
+  "rule": "Select minimum objective-change + fading direction penalty among evaluated probes, even uphill; deterministic ties; no separate kick or enclosing trust region.",
+  "learning": "Coordinate scales learn from their own gradient-aligned objective trials each update. Escape probes do not directly update scales or delta.",
+  "sources": {
+    "saddle/simulator.py": "475cb39c0f7225a3379d8d4f6ac513dec455bbcd7afaf7ebf518af748d3eda40",
+    "saddle/metrics.py": "82484c75b9189ed86fc2a171c29820b83cdccad4897ab0e44821112acd759794",
+    "saddle/benchmark.py": "b79c725bc77ab6d32e443ac6b06a830e79f25d5809fee1e4c02ea5587295780d",
+    "saddle/cases.py": "8a22f19237f579a3dd2c7af8d1beee2fa6a1bf923b880d6f21c9f8fe63abdbd9",
+    "saddle/__init__.py": "6afe772bfce0525a3ea18e4bec3bae89a510ab1a23c08df740d19d03e53c4d9e",
+    "saddle/algorithms/probe.py": "8c0d10b91eeb3e00cae043a90ca7ca241a5cdd4506c6dd5fa97ea3f9b6d145c2",
+    "saddle/algorithms/jin_pgd.py": "d41d957746eaa976debddc1b26dfcd66e5189a3e9b516913cdc2305e0d09cdc5",
+    "saddle/algorithms/proposed.py": "072e9042070afc9eae1e78d65f4978e40c177429a222f83612abe0fa177ee880",
+    "saddle/algorithms/probe_nesterov.py": "dba961ec96f01cccc8af6b2c6254593d1a2c46717a6e56b5d04497de7ed57026",
+    "saddle/algorithms/gd.py": "0de4310f4e48e120ca763a8fc1a90178bfdbc238ea995a33a3e800e3cc8c23a8",
+    "saddle/algorithms/ldh_guessed.py": "91c4f8d892f0d5d3a1cb0b54cc06ef6f1059e9980b876556d41cc54ce3be0f95",
+    "saddle/algorithms/pgd.py": "82765791010e1f6f979b2071bd37240925bb7942c9c94bd4225e7efaaa17ec16",
+    "saddle/algorithms/ldh_probe_tie.py": "224963f7eeac7050b1914b91624b60709a8984155d1079db27f7391dce5174a5",
+    "saddle/algorithms/base.py": "5d0eee6bcbe7ec14719496f5dc940813dae0bc69eb5dd4f5910da6fab6c8dc3c",
+    "saddle/algorithms/learned_step.py": "b4f63d0a07e225db616af6f117c20ccd05cff21b8810ddaeb6114a20af822238",
+    "saddle/algorithms/ldh.py": "08e0839d866905b3b28a93f69126c52061179e6221c76c62255f72af9425a523",
+    "saddle/algorithms/gdnc.py": "5d5ac5c30f4debe14252167aef781b5048c76185828cca2c0c37bdf3038a1c68",
+    "saddle/algorithms/__init__.py": "ad4e93a7d8159de7fd9aceb1513b927cd645fcf9a7a6925e8f1316322799e265",
+    "saddle/algorithms/probe_walk.py": "f6ceb451393701a5813a4d1a84780384147916169fbb2bb7205295e86c30ed6f"
+  }
+}

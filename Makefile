@@ -90,5 +90,9 @@ compare-100d-all:
 check-probe-tie:
 	$(PY) experiments/check_probe_tie.py
 
+.PHONY: check-deterministic
+check-deterministic:
+	$(PY) experiments/deterministic_correction.py
+
 clean:
 	rm -rf __pycache__ */__pycache__ */*/__pycache__ tests/__pycache__ frame_*.png

@@ -225,7 +225,8 @@ def main():
                 continue
             problem = RotatedSaddle.random(100, gamma, seed=args.rotation_seed)
             # Pass seed explicitly, including through LDH's **kwargs wrapper.
-            algorithm = METHODS[name](problem, problem.start(start), seed=seed, max_iters=args.k)
+            options = dict(best_probe=False, kick=True) if name == "LDH-GD" else {}
+            algorithm = METHODS[name](problem, problem.start(start), seed=seed, max_iters=args.k, **options)
             if name == "LDH-GD" and algorithm.R != 10:
                 raise RuntimeError("LDH must use the new dimension-dependent budget R=10; pull all-methods.")
             algorithm.run()

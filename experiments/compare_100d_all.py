@@ -58,7 +58,7 @@ def main():
                         problem=RotatedSaddle.random(100,gamma,seed=0)
                         kwargs=dict(max_iters=args.k)
                         if cls is not GDNC: kwargs['seed']=seed
-                        if cls is LDH: kwargs['R']=args.rounds
+                        if cls is LDH: kwargs.update(R=args.rounds, best_probe=False, kick=True)
                         algorithm=cls(problem,problem.start(start),**kwargs)
                         streaks=[]
                         if cls is LDH:

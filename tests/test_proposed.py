@@ -115,18 +115,20 @@ class TestParts(unittest.TestCase):
                     a.run()
                     self.assertTrue(at_min(a), (cls.name, P.label, start))
 
-    def test_dimension_budget_rescues_100d_exact_saddle(self):
+    def test_legacy_kick_dimension_budget_rescues_100d_exact_saddle(self):
         from saddle.metrics import evaluate
 
         for gamma in (0.1, 0.01):
             with self.subTest(gamma=gamma):
                 problem = RotatedSaddle.random(100, gamma, seed=0)
-                original = LDH(problem, problem.start("on"), seed=0, R=3)
+                original = LDH(problem, problem.start("on"), seed=0, R=3,
+                               best_probe=False, kick=True)
                 original.run()
                 self.assertIsNone(evaluate(original)["k_succ"])
 
                 problem = RotatedSaddle.random(100, gamma, seed=0)
-                adaptive = LDH(problem, problem.start("on"), seed=0)
+                adaptive = LDH(problem, problem.start("on"), seed=0,
+                               best_probe=False, kick=True)
                 self.assertEqual(adaptive.R, 10)
                 adaptive.run()
                 self.assertIsNotNone(evaluate(adaptive)["k_succ"])

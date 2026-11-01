@@ -107,11 +107,13 @@ class Proposed(Algorithm):
     def __init__(self, problem, z0, max_iters=3000, seed=0, g_trig=G_TRIG,
                  learn_step="axes", band=1, escape="bag", bag_size=4, kick=True, penalty=True,
                  delta=1e-2, r=R_DEFAULT, R=None, h=1e-5, p0=1e-4, beta=0.9, eps_f=1e-12,
-                 kappa=0.5, omega=2.0, d_min=1e-6, d_max=100.0, basis_every=20, L=1.0):
+                 kappa=0.5, omega=2.0, d_min=1e-6, d_max=100.0, basis_every=20, L=1.0,
+                 best_probe=False):
         # which parts are on
         if learn_step is True:                   # the older setting meant per-axis steps
             learn_step = "axes"
         self.learn_step, self.escape, self.kick, self.penalty = learn_step, escape, kick, penalty
+        self.best_probe = best_probe
         self.basis_every = basis_every            # how often B is measured again for the steps
         self.L = L                                # first guess of every curvature (guessed B)
         if escape == "guessed" and learn_step != "axes":
@@ -147,6 +149,7 @@ class Proposed(Algorithm):
         self.f_start = None                           # f where the current search started
         self.stopped = False                          # "very likely a minimum" flag
         self.jumps, self.kicks, self.giveups = [], [], []
+        self.walks = []
 
     # ------------------------------------------------------------------
     def update(self):
@@ -348,6 +351,13 @@ class Proposed(Algorithm):
         self.fails += 1                               # nothing went down this round
         if self.fails >= self.R:
             self._give_up()
+        elif self.best_probe:
+            # Deterministic exploration: reuse the best scored evaluated probe,
+            # even uphill. There is no new sampled kick or enclosing trust region.
+            self._remember_direction(v)
+            self.walks.append(self.k)
+            self.log_round("walked")
+            self._move(zp, fp)
         elif self.kick:
             self._kick(dirs)
         else:
